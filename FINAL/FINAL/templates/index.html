@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ABSA 细粒度情感分析系统</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>ABSA 细粒度情感分析系统</h1>
+            <p class="subtitle">基于 RoBERTa 模型的 18 维度属性级情感分析</p>
+            <div id="modelStatus" class="model-status">
+                <span class="dot"></span> 模型服务检测中...
+            </div>
+        </header>
+
+        <main>
+            <!-- 上传区域 -->
+            <section class="upload-section">
+                <h2>批量导入评论</h2>
+                <div class="upload-area" id="dropZone">
+                    <p>拖拽文件到此处或点击选择</p>
+                    <input type="file" id="fileInput" accept=".txt,.csv,.xlsx" multiple>
+                    <p class="file-info">支持 TXT(每行一条) / CSV / XLSX</p>
+                    <button id="uploadBtn" class="btn btn-primary">上传分析</button>
+                </div>
+            </section>
+
+            <!-- 手动输入 -->
+            <section class="text-input-section">
+                <h2>手动输入评论</h2>
+                <textarea id="textInput" placeholder="请输入评论文本..." rows="4"></textarea>
+                <button id="analyzeBtn" class="btn btn-secondary">分析</button>
+            </section>
+
+            <!-- 加载中 -->
+            <div class="loading" id="loadingIndicator" style="display:none;">
+                <div class="spinner"></div>
+                <p>正在分析中，请稍候...</p>
+            </div>
+
+            <!-- 错误提示 -->
+            <div class="error-message" id="errorMessage" style="display:none;">
+                <p id="errorText"></p>
+            </div>
+
+            <!-- ====== 结果区域 ====== -->
+            <section class="results-section" id="resultsSection" style="display:none;">
+
+                <!-- 概览卡片 -->
+                <h2>分析概览</h2>
+                <div class="summary-cards">
+                    <div class="card"><h3>总评论数</h3><p class="number" id="totalCount">0</p></div>
+                    <div class="card"><h3>总维度数</h3><p class="number" id="totalAspects">0</p></div>
+                    <div class="card"><h3>平均维度/条</h3><p class="number" id="avgAspects">0</p></div>
+                    <div class="card positive"><h3>正向评论</h3><p class="number" id="posReviews">0</p><p class="percentage" id="posReviewsPct">0%</p></div>
+                    <div class="card negative"><h3>负向评论</h3><p class="number" id="negReviews">0</p><p class="percentage" id="negReviewsPct">0%</p></div>
+                </div>
+
+                <!-- 整体情感分布图 -->
+                <div class="charts-container">
+                    <div class="chart-wrapper">
+                        <h3>评论整体情感分布</h3>
+                        <canvas id="reviewPieChart"></canvas>
+                    </div>
+                    <div class="chart-wrapper">
+                        <h3>评价维度情感分布</h3>
+                        <canvas id="aspectPieChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 5 个一级维度统计 -->
+                <h2>一级维度分析</h2>
+                <div class="chart-wrapper">
+                    <canvas id="groupChart"></canvas>
+                </div>
+                <div id="groupDetail" class="group-detail"></div>
+
+                <!-- 18 维度排名 -->
+                <h2>18 维度好评率排名</h2>
+                <div class="chart-wrapper full">
+                    <canvas id="rankingChart"></canvas>
+                </div>
+
+                <!-- 评论详情列表 -->
+                <h2>评论详情</h2>
+                <div class="reviews-list" id="reviewsList"></div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>
