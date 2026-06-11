@@ -28,8 +28,7 @@ Thumbs.db
 *.sublime-*
 
 # 数据（太大，用脚本重新生成）
-data/processed/
-data/asap/
+data/
 
 # 模型（太大，提供训练脚本）
 models/

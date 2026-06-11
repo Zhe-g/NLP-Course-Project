@@ -14,6 +14,15 @@ MODEL_API_SCRIPT = os.path.join(BASE_DIR, "scripts", "run_api.py")
 WEB_APP_FILE = os.path.join(os.path.dirname(__file__), "app.py")
 
 
+def _read_output(proc, prefix):
+    """读取子进程输出"""
+    while True:
+        line = proc.stdout.readline()
+        if not line:
+            break
+        print(f"  [{prefix}] {line.rstrip()}")
+
+
 def start_model_api():
     """启动模型 API (端口 5000)"""
     print("[1/2] 启动模型 API 服务 (http://localhost:5000)...")
@@ -24,14 +33,7 @@ def start_model_api():
         text=True,
         bufsize=1,
     )
-    # 启动线程读取输出
-    def read_output():
-        while True:
-            line = proc.stdout.readline()
-            if not line:
-                break
-            print(f"  [API] {line.rstrip()}")
-    threading.Thread(target=read_output, daemon=True).start()
+    threading.Thread(target=_read_output, args=(proc, "API"), daemon=True).start()
     return proc
 
 
@@ -40,13 +42,16 @@ def start_web_ui():
     print("[2/2] 启动 Web 界面 (http://localhost:5001)...")
     proc = subprocess.Popen(
         [sys.executable, WEB_APP_FILE],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
     )
+    threading.Thread(target=_read_output, args=(proc, "WEB"), daemon=True).start()
     return proc
 
 
-def wait_for_api(url: str, timeout: int = 30):
+def wait_for_api(url: str, timeout: int = 60):
     """等待 API 就绪"""
     import urllib.request
     for i in range(timeout):
