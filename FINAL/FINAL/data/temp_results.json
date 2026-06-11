@@ -1,0 +1,45 @@
+{
+  "summary": {
+    "total_reviews": 5,
+    "positive_reviews": 0,
+    "negative_reviews": 2,
+    "neutral_reviews": 3,
+    "positive_ratio": 0.0,
+    "negative_ratio": 40.0,
+    "neutral_ratio": 60.0,
+    "average_score": 0.358,
+    "analysis_time": "2026-06-07 12:38:16"
+  },
+  "results": [
+    {
+      "text": "这个产品很棒，强烈推荐！",
+      "score": 0.456,
+      "label": "neutral",
+      "sentiment": "中性"
+    },
+    {
+      "text": "质量一般，价格偏贵。",
+      "score": 0.201,
+      "label": "negative",
+      "sentiment": "负面"
+    },
+    {
+      "text": "非常满意，会回购的。",
+      "score": 0.453,
+      "label": "neutral",
+      "sentiment": "中性"
+    },
+    {
+      "text": "服务态度不好。",
+      "score": 0.084,
+      "label": "negative",
+      "sentiment": "负面"
+    },
+    {
+      "text": "性价比很高，值得购买。",
+      "score": 0.597,
+      "label": "neutral",
+      "sentiment": "中性"
+    }
+  ]
+}

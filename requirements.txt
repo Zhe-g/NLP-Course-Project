@@ -1,0 +1,13 @@
+torch>=2.0.0
+transformers>=4.40.0
+datasets
+accelerate
+jieba
+flask
+requests
+pandas
+scikit-learn
+tqdm
+numpy
+matplotlib
+zhconv

@@ -1,0 +1,39 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+.conda/
+*.egg-info/
+dist/
+build/
+
+# 训练缓存
+.cache/
+*.log
+checkpoint-*/
+
+# 临时文件
+uploads/*
+!uploads/.gitkeep
+*.tmp
+*.swp
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.sublime-*
+
+# 数据（太大，用脚本重新生成）
+data/processed/
+data/asap/
+
+# 模型（太大，提供训练脚本）
+models/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
