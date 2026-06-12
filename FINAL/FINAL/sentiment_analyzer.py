@@ -207,9 +207,15 @@ def _compute_multi_dimension_summary(results: list[dict]) -> dict:
     category_rankings = []
     for cat, s in cat_counter.items():
         t = max(s["total"], 1)
+        # 从当前类别的aspect中获取正确的category_zh
+        cat_zh = cat  # fallback
+        for a in all_aspects:
+            if a.get("category") == cat:
+                cat_zh = a.get("category_zh", cat)
+                break
         category_rankings.append({
             "category": cat,
-            "category_zh": all_aspects[0].get("category_zh", cat) if all_aspects else cat,
+            "category_zh": cat_zh,
             "total": s["total"],
             "positive_ratio": round(s["positive"] / t * 100, 1),
             "negative_ratio": round(s["negative"] / t * 100, 1),
