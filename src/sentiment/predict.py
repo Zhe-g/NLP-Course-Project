@@ -4,9 +4,27 @@
 """
 import os
 import torch
-from transformers import AutoTokenizer
-from src.config import PRETRAINED_MODEL, SENTIMENT_MODEL_PATH, SENTIMENT_CONFIG, DEVICE, CATEGORY_ZH
-from src.sentiment.model import SentimentModel
+
+# 延迟导入
+_transformers = None
+_SentimentModel = None
+
+
+def _get_transformers():
+    global _transformers
+    if _transformers is None:
+        from transformers import AutoTokenizer
+        _transformers = AutoTokenizer
+    return _transformers
+
+
+def _get_model_class():
+    global _SentimentModel
+    if _SentimentModel is None:
+        from src.sentiment.model import SentimentModel
+        _SentimentModel = SentimentModel
+    return _SentimentModel
+
 
 SENTIMENT_NAMES = ["neutral", "positive", "negative"]
 SENTIMENT_ZH = {"neutral": "中性", "positive": "正向", "negative": "负向"}
@@ -15,8 +33,17 @@ SENTIMENT_ZH = {"neutral": "中性", "positive": "正向", "negative": "负向"}
 class SentimentPredictor:
     """情感极性推理器"""
 
-    def __init__(self, model_path: str = SENTIMENT_MODEL_PATH):
+    def __init__(self, model_path: str = None):
+        from src.config import PRETRAINED_MODEL, SENTIMENT_MODEL_PATH, DEVICE, SENTIMENT_CONFIG, CATEGORY_ZH
         self.device = DEVICE
+        self.SENTIMENT_CONFIG = SENTIMENT_CONFIG
+        self.CATEGORY_ZH = CATEGORY_ZH
+        
+        if model_path is None:
+            model_path = SENTIMENT_MODEL_PATH
+
+        AutoTokenizer = _get_transformers()
+        SentimentModel = _get_model_class()
 
         if os.path.exists(model_path):
             self.tokenizer = AutoTokenizer.from_pretrained(model_path)
@@ -36,22 +63,12 @@ class SentimentPredictor:
 
     @torch.no_grad()
     def predict(self, text: str, category: str) -> dict:
-        """
-        预测文本中特定维度的情感极性
-
-        Args:
-            text: 评论文本
-            category: 维度名 (如 "dish_taste")
-
-        Returns:
-            {"sentiment": "positive", "sentiment_zh": "正向", "confidence": 0.93}
-        """
-        category_zh = CATEGORY_ZH.get(category, category)
+        category_zh = self.CATEGORY_ZH.get(category, category)
 
         encoding = self.tokenizer(
             category_zh,
             text,
-            max_length=SENTIMENT_CONFIG["max_length"],
+            max_length=self.SENTIMENT_CONFIG["max_length"],
             padding="max_length",
             truncation=True,
             return_tensors="pt",
@@ -79,6 +96,6 @@ class SentimentPredictor:
         for cat in categories:
             result = self.predict(text, cat)
             result["category"] = cat
-            result["category_zh"] = CATEGORY_ZH.get(cat, cat)
+            result["category_zh"] = self.CATEGORY_ZH.get(cat, cat)
             results.append(result)
         return results

@@ -16,16 +16,21 @@ from src.analysis.aggregator import StatisticsAggregator
 # 创建Flask应用
 app = Flask(__name__)
 
-# 全局分析器实例（启动时加载，避免子线程中初始化CUDA）
-print("=" * 50)
-print("  初始化 ABSA 分析器...")
-print("=" * 50)
-_analyzer = ABSAAnalyzer()
+# 全局分析器实例（外部注入）
+_analyzer = None
 _aggregator = StatisticsAggregator()
+
+
+def set_analyzer(analyzer):
+    """设置分析器实例（供外部调用）"""
+    global _analyzer
+    _analyzer = analyzer
 
 
 def get_analyzer():
     """获取分析器实例"""
+    if _analyzer is None:
+        raise RuntimeError("分析器未初始化，请先调用 set_analyzer()")
     return _analyzer
 
 

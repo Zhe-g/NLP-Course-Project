@@ -10,12 +10,21 @@ body {
     background-color: #f5f7fa;
     color: #333;
     line-height: 1.6;
+    min-height: 100vh;
 }
 
 .container {
-    max-width: 1200px;
+    max-width: 1100px;
+    width: 100%;
     margin: 0 auto;
     padding: 20px;
+    min-width: 300px;
+}
+
+.main-content {
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto;
 }
 
 /* Header Styles */
@@ -112,6 +121,17 @@ h2 {
     box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
 }
 
+/* Button Row */
+.button-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 15px;
+}
+
+.button-row .btn {
+    margin-left: 10px;
+}
+
 /* Text Input */
 .text-input-section textarea {
     width: 100%;
@@ -126,6 +146,54 @@ h2 {
 .text-input-section textarea:focus {
     outline: none;
     border-color: #667eea;
+}
+
+/* Cumulative Stats */
+.cumulative-section {
+    margin-bottom: 30px;
+}
+
+.cumulative-section h2 {
+    margin-bottom: 20px;
+    color: #333;
+    font-size: 1.3rem;
+    text-align: center;
+}
+
+.cumulative-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 15px;
+    justify-items: center;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.stat-item {
+    width: 150px;
+    text-align: center;
+    padding: 18px 15px;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    border-radius: 8px;
+    transition: transform 0.3s ease;
+}
+
+.stat-item:hover {
+    transform: translateY(-3px);
+}
+
+.stat-value {
+    display: block;
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: white;
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    display: block;
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.9);
 }
 
 /* Summary Cards */
@@ -181,24 +249,46 @@ h2 {
 /* Charts */
 .charts-container {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(400px, 500px));
     gap: 30px;
     margin-bottom: 30px;
+    justify-content: center;
+    max-width: 1100px;
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .chart-wrapper {
     background: #f8f9fa;
     padding: 20px;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    width: 500px;
+    max-width: calc(100% - 40px);
+    margin: 0 auto;
+    box-sizing: border-box;
 }
 
-.score-chart {
-    grid-column: 1 / -1;
+.chart-wrapper h3 {
+    margin-bottom: 15px;
+    color: #333;
+    font-size: 1rem;
+    text-align: center;
 }
 
-.score-chart canvas {
-    max-height: 400px;
+.chart-wrapper canvas {
+    width: 100% !important;
+    height: 280px !important;
+    max-height: 280px;
+}
+
+.radar-chart-wrapper {
+    padding: 15px;
+}
+
+.radar-chart-wrapper canvas {
+    height: 260px !important;
+    max-height: 260px;
 }
 
 /* Reviews List */
@@ -234,6 +324,16 @@ h2 {
 .review-text {
     margin-bottom: 10px;
     color: #333;
+}
+
+.analysis-tag {
+    font-size: 0.75rem;
+    color: #999;
+    background: #e2e8f0;
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    display: inline-block;
 }
 
 .review-meta {
@@ -284,6 +384,59 @@ h2 {
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* Progress Bar */
+.progress-container {
+    margin-top: 20px;
+    max-width: 300px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #e2e8f0;
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    min-width: 0%;
+    max-width: 100%;
+}
+
+.progress-fill::after {
+    content: '';
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+    animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+
+#progressPercent {
+    display: block;
+    margin-top: 10px;
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #667eea;
+}
+
+#loadingText {
+    font-size: 1rem;
+    color: #666;
+    margin-bottom: 10px;
 }
 
 /* Error Message */
@@ -360,14 +513,782 @@ h2 {
 .chart-wrapper.full {
     grid-column: 1 / -1;
     min-height: 400px;
+    max-width: 900px;
+    margin: 0 auto;
+    width: 100%;
 }
 
-/* Responsive Design */
+/* ===== 模式切换按钮 ===== */
+.mode-switch {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.mode-btn {
+    flex: 1;
+    padding: 12px 20px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    background: #fff;
+    color: #666;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.mode-btn:hover {
+    border-color: #667eea;
+    color: #667eea;
+}
+
+.mode-btn.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: transparent;
+    color: white;
+}
+
+.mode-btn .icon {
+    font-size: 1.2rem;
+}
+
+/* ===== 输入面板 ===== */
+.input-panel {
+    margin-top: 15px;
+}
+
+/* ===== 拖拽上传区域 ===== */
+.drop-zone {
+    border: 2px dashed #cbd5e0;
+    border-radius: 12px;
+    padding: 40px 20px;
+    text-align: center;
+    background: #f8fafc;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.drop-zone:hover {
+    border-color: #667eea;
+    background: #f0f4ff;
+}
+
+.drop-zone.dragover {
+    border-color: #667eea;
+    background: #e8efff;
+    transform: scale(1.01);
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.2);
+}
+
+.drop-zone-content {
+    pointer-events: none;
+}
+
+.drop-icon {
+    font-size: 3rem;
+    display: block;
+    margin-bottom: 15px;
+}
+
+.drop-text {
+    font-size: 1.1rem;
+    color: #4a5568;
+    margin-bottom: 8px;
+}
+
+.click-upload {
+    color: #667eea;
+    font-weight: 600;
+    text-decoration: underline;
+}
+
+.drop-hint {
+    font-size: 0.85rem;
+    color: #a0aec0;
+}
+
+#fileInput {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+}
+
+/* ===== 文件列表 ===== */
+.file-list {
+    margin-top: 15px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.file-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    background: #f7fafc;
+    border-bottom: 1px solid #e2e8f0;
+    font-weight: 500;
+    color: #4a5568;
+}
+
+.btn-clear {
+    background: none;
+    border: none;
+    color: #e53e3e;
+    font-size: 0.85rem;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.btn-clear:hover {
+    background: #fed7d7;
+}
+
+.file-list-content {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.file-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 15px;
+    border-bottom: 1px solid #f0f0f0;
+    background: white;
+}
+
+.file-item:last-child {
+    border-bottom: none;
+}
+
+.file-item-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.file-icon {
+    font-size: 1.5rem;
+}
+
+.file-name {
+    font-size: 0.9rem;
+    color: #333;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-size {
+    font-size: 0.8rem;
+    color: #a0aec0;
+}
+
+.file-remove {
+    background: none;
+    border: none;
+    color: #a0aec0;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.file-remove:hover {
+    color: #e53e3e;
+    background: #fed7d7;
+}
+
+/* ===== 筛选控件 ===== */
+.filter-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 20px;
+    align-items: center;
+}
+
+.filter-search {
+    flex: 1;
+    min-width: 200px;
+}
+
+.filter-search input {
+    width: 100%;
+    padding: 10px 15px;
+    border: 2px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    transition: border-color 0.3s ease;
+}
+
+.filter-search input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.filter-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.filter-btn {
+    padding: 8px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 6px;
+    background: white;
+    color: #666;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.filter-btn:hover {
+    border-color: #667eea;
+    color: #667eea;
+}
+
+.filter-btn.active {
+    background: #667eea;
+    border-color: #667eea;
+    color: white;
+}
+
+.filter-info {
+    font-size: 0.85rem;
+    color: #666;
+}
+
+/* ===== 分页控件 ===== */
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    margin-top: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.page-btn {
+    padding: 8px 20px;
+    border: 2px solid #667eea;
+    border-radius: 6px;
+    background: white;
+    color: #667eea;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.page-btn:hover {
+    background: #667eea;
+    color: white;
+}
+
+.page-btn:disabled {
+    border-color: #ccc;
+    color: #999;
+    cursor: not-allowed;
+    background: #f5f5f5;
+}
+
+#pageInfo {
+    font-size: 0.95rem;
+    color: #333;
+    font-weight: 500;
+}
+
+/* ===== 工具栏 ===== */
+.results-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.toolbar-title {
+    font-size: 1.5rem;
+    color: #333;
+    margin: 0;
+}
+
+.toolbar-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.toolbar-btn {
+    padding: 8px 16px;
+    border: 2px solid #667eea;
+    border-radius: 6px;
+    background: white;
+    color: #667eea;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.toolbar-btn:hover {
+    background: #667eea;
+    color: white;
+}
+
+.toolbar-btn span {
+    font-size: 1rem;
+}
+
+/* ===== 导出下拉菜单 ===== */
+.export-dropdown {
+    position: relative;
+}
+
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 100;
+    min-width: 140px;
+    margin-top: 5px;
+}
+
+.dropdown-menu.show {
+    display: block;
+}
+
+.dropdown-menu button {
+    width: 100%;
+    padding: 10px 15px;
+    border: none;
+    background: none;
+    text-align: left;
+    font-size: 0.9rem;
+    cursor: pointer;
+    color: #333;
+}
+
+.dropdown-menu button:hover {
+    background: #f7fafc;
+    color: #667eea;
+}
+
+.dropdown-menu button:first-child {
+    border-radius: 6px 6px 0 0;
+}
+
+.dropdown-menu button:last-child {
+    border-radius: 0 0 6px 6px;
+}
+
+/* ===== 暂存列表 ===== */
+.stash-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.stash-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
+    border-radius: 6px;
+    margin-bottom: 8px;
+}
+
+.stash-item:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.stash-item-info {
+    flex: 1;
+}
+
+.stash-item-title {
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.stash-item-meta {
+    font-size: 0.8rem;
+    color: #666;
+}
+
+.stash-item-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.stash-item-btn {
+    padding: 5px 10px;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.stash-item-btn.view {
+    background: #e2e8f0;
+    color: #333;
+}
+
+.stash-item-btn.view:hover {
+    background: #667eea;
+    color: white;
+}
+
+.stash-item-btn.delete {
+    background: #fed7d7;
+    color: #9b2c2c;
+}
+
+.stash-item-btn.delete:hover {
+    background: #f56565;
+    color: white;
+}
+
+.stash-empty {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+}
+
+/* ===== 模态框 ===== */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-overlay.show {
+    display: flex;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #333;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #999;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.modal-close:hover {
+    color: #333;
+}
+
+.modal-body {
+    padding: 20px;
+    flex: 1;
+    overflow-y: auto;
+}
+
+.modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 15px 20px;
+    border-top: 1px solid #e2e8f0;
+}
+
+/* ===== 危险按钮 ===== */
+.btn-danger {
+    background-color: #f56565;
+    color: white;
+    border: none;
+}
+
+.btn-danger:hover {
+    background-color: #e53e3e;
+}
+
+/* ===== 响应式设计 ===== */
+
+/* 超大屏幕 (> 1400px) */
+@media (min-width: 1400px) {
+    .container {
+        max-width: 1320px;
+        margin: 0 auto;
+    }
+    .charts-container {
+        grid-template-columns: repeat(2, 500px);
+        justify-content: center;
+    }
+}
+
+/* 大屏幕 (1200px - 1400px) */
+@media (max-width: 1400px) {
+    .container {
+        max-width: 1140px;
+        margin: 0 auto;
+    }
+}
+
+/* 中等屏幕 (992px - 1200px) */
+@media (max-width: 1200px) {
+    .container {
+        max-width: 960px;
+        margin: 0 auto;
+    }
+    .charts-container {
+        grid-template-columns: repeat(auto-fit, minmax(400px, 500px));
+        justify-content: center;
+    }
+}
+
+/* 平板屏幕 (768px - 992px) */
+@media (max-width: 992px) {
+    .container {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 0 20px;
+    }
+    .charts-container {
+        grid-template-columns: 1fr;
+    }
+    .summary-cards {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .group-detail {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+/* 小屏幕手机 (576px - 768px) */
 @media (max-width: 768px) {
-    .container { padding: 10px; }
-    header { padding: 20px; }
-    h1 { font-size: 1.8rem; }
-    .charts-container { grid-template-columns: 1fr; }
-    .summary-cards { grid-template-columns: repeat(2, 1fr); }
-    .group-detail { grid-template-columns: 1fr; }
+    .container {
+        padding: 10px;
+    }
+    header {
+        padding: 20px 10px;
+        text-align: center;
+    }
+    h1 {
+        font-size: 1.6rem;
+    }
+    .subtitle {
+        font-size: 0.9rem;
+    }
+    .charts-container {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    .chart-wrapper {
+        min-height: 300px;
+        padding: 15px;
+    }
+    .chart-wrapper canvas {
+        height: 250px !important;
+    }
+    .summary-cards {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+    .summary-card {
+        padding: 15px;
+    }
+    .group-detail {
+        grid-template-columns: 1fr;
+    }
+    .mode-switch {
+        flex-direction: column;
+        gap: 10px;
+    }
+    .mode-btn {
+        width: 100%;
+        padding: 12px;
+    }
+    .drop-zone {
+        padding: 30px 15px;
+        min-height: 150px;
+    }
+    .file-name {
+        max-width: 150px;
+    }
+    .filter-controls {
+        flex-direction: column;
+        gap: 15px;
+    }
+    .filter-search {
+        min-width: 100%;
+        width: 100%;
+    }
+    .filter-buttons {
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    .results-toolbar {
+        flex-direction: column;
+        gap: 15px;
+        align-items: stretch;
+    }
+    .toolbar-title {
+        font-size: 1.2rem;
+        text-align: center;
+    }
+    .toolbar-actions {
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .toolbar-btn {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+    }
+    .modal-content {
+        width: 95%;
+        max-height: 85vh;
+    }
+    .review-item {
+        padding: 12px;
+    }
+    .review-text {
+        font-size: 0.9rem;
+    }
+    .aspect-tag {
+        font-size: 0.75rem;
+        padding: 3px 6px;
+        margin: 2px;
+    }
+    .pagination {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    .page-btn {
+        padding: 6px 14px;
+        font-size: 0.8rem;
+    }
+}
+
+/* 超小屏幕手机 (< 576px) */
+@media (max-width: 576px) {
+    body {
+        font-size: 14px;
+    }
+    h1 {
+        font-size: 1.4rem;
+    }
+    h2 {
+        font-size: 1.2rem;
+    }
+    h3 {
+        font-size: 1rem;
+    }
+    .summary-cards {
+        grid-template-columns: 1fr;
+    }
+    .summary-card {
+        text-align: center;
+    }
+    .chart-wrapper {
+        min-height: 280px;
+        padding: 12px;
+    }
+    .chart-wrapper canvas {
+        height: 220px !important;
+    }
+    .drop-zone {
+        padding: 20px 10px;
+        min-height: 120px;
+    }
+    .drop-zone p {
+        font-size: 0.85rem;
+    }
+    .toolbar-actions {
+        flex-direction: column;
+    }
+    .toolbar-btn {
+        width: 100%;
+        justify-content: center;
+    }
+    .modal-header h3 {
+        font-size: 1rem;
+    }
+    .modal-footer {
+        flex-direction: column;
+    }
+    .modal-footer .btn {
+        width: 100%;
+    }
+}
+
+/* 横向模式手机 */
+@media (max-height: 500px) and (orientation: landscape) {
+    header {
+        padding: 15px;
+    }
+    h1 {
+        font-size: 1.3rem;
+    }
+    .chart-wrapper {
+        min-height: 200px;
+    }
+    .chart-wrapper canvas {
+        height: 160px !important;
+    }
 }

@@ -4,29 +4,52 @@
 """
 import os
 import torch
-from transformers import AutoTokenizer
-from src.config import PRETRAINED_MODEL, ASPECT_MODEL_PATH, ASPECT_CONFIG, ASAP_CATEGORIES, DEVICE
-from src.aspect_detection.model import AspectDetectionModel
+
+# 延迟导入 transformers，避免模块加载时卡顿
+_transformers = None
+_AspectDetectionModel = None
+
+
+def _get_transformers():
+    global _transformers
+    if _transformers is None:
+        from transformers import AutoTokenizer
+        _transformers = AutoTokenizer
+    return _transformers
+
+
+def _get_model_class():
+    global _AspectDetectionModel
+    if _AspectDetectionModel is None:
+        from src.aspect_detection.model import AspectDetectionModel
+        _AspectDetectionModel = AspectDetectionModel
+    return _AspectDetectionModel
 
 
 class AspectPredictor:
     """属性检测推理器"""
 
-    def __init__(self, model_path: str = ASPECT_MODEL_PATH):
+    def __init__(self, model_path: str = None):
+        from src.config import PRETRAINED_MODEL, ASPECT_MODEL_PATH, DEVICE, ASPECT_CONFIG, ASAP_CATEGORIES
         self.device = DEVICE
+        self.ASAP_CATEGORIES = ASAP_CATEGORIES
+        self.ASPECT_CONFIG = ASPECT_CONFIG
+        
+        if model_path is None:
+            model_path = ASPECT_MODEL_PATH
 
-        # 加载tokenizer和模型
+        AutoTokenizer = _get_transformers()
+        AspectDetectionModel = _get_model_class()
+
         if os.path.exists(model_path):
             self.tokenizer = AutoTokenizer.from_pretrained(model_path)
             self.model = AspectDetectionModel(pretrained_model=model_path)
-            # 加载分类头
             classifier_path = os.path.join(model_path, "classifier.pt")
             if os.path.exists(classifier_path):
                 self.model.classifier.load_state_dict(
                     torch.load(classifier_path, map_location=self.device)
                 )
         else:
-            # 模型未训练时使用预训练模型
             print(f"警告: 未找到训练好的模型 {model_path}，使用预训练模型（未微调）")
             self.tokenizer = AutoTokenizer.from_pretrained(PRETRAINED_MODEL)
             self.model = AspectDetectionModel(pretrained_model=PRETRAINED_MODEL)
@@ -37,20 +60,12 @@ class AspectPredictor:
 
     @torch.no_grad()
     def predict(self, text: str, threshold: float = None) -> dict:
-        """
-        预测单条文本中提到的属性维度
-
-        Returns:
-            dict: {
-                "categories": [{"name": "...", "name_zh": "...", "prob": 0.xx}, ...]
-            }
-        """
         if threshold is None:
             threshold = self.threshold
 
         encoding = self.tokenizer(
             text,
-            max_length=ASPECT_CONFIG["max_length"],
+            max_length=self.ASPECT_CONFIG["max_length"],
             padding="max_length",
             truncation=True,
             return_tensors="pt",
@@ -65,7 +80,7 @@ class AspectPredictor:
         from src.taxonomy.categories import get_category_zh
 
         categories = []
-        for i, (cat_name, prob) in enumerate(zip(ASAP_CATEGORIES, probs)):
+        for i, (cat_name, prob) in enumerate(zip(self.ASAP_CATEGORIES, probs)):
             if prob >= threshold:
                 categories.append({
                     "name": cat_name,

@@ -6,6 +6,7 @@
     <title>ABSA 细粒度情感分析系统</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -18,28 +19,62 @@
         </header>
 
         <main>
-            <!-- 上传区域 -->
-            <section class="upload-section">
-                <h2>批量导入评论</h2>
-                <div class="upload-area" id="dropZone">
-                    <p>拖拽文件到此处或点击选择</p>
-                    <input type="file" id="fileInput" accept=".txt,.csv,.xlsx" multiple>
-                    <p class="file-info">支持 TXT(每行一条) / CSV / XLSX</p>
-                    <button id="uploadBtn" class="btn btn-primary">上传分析</button>
-                </div>
-            </section>
-
-            <!-- 手动输入 -->
+            <!-- 输入区域 -->
             <section class="text-input-section">
-                <h2>手动输入评论</h2>
-                <textarea id="textInput" placeholder="请输入评论文本..." rows="4"></textarea>
-                <button id="analyzeBtn" class="btn btn-secondary">分析</button>
+                <h2>请输入您的评价</h2>
+
+                <!-- 模式切换按钮 -->
+                <div class="mode-switch">
+                    <button id="textModeBtn" class="mode-btn active" onclick="switchMode('text')">
+                        <span class="icon">✏️</span> 手动输入
+                    </button>
+                    <button id="fileModeBtn" class="mode-btn" onclick="switchMode('file')">
+                        <span class="icon">📁</span> 文件上传
+                    </button>
+                </div>
+
+                <!-- 手动输入模式 -->
+                <div id="textModePanel" class="input-panel">
+                    <textarea id="textInput" placeholder="请输入评论文本..." rows="4"></textarea>
+                    <div class="button-row">
+                        <button id="analyzeBtn" class="btn btn-secondary">分析</button>
+                    </div>
+                </div>
+
+                <!-- 文件上传模式 -->
+                <div id="fileModePanel" class="input-panel" style="display: none;">
+                    <div id="dropZone" class="drop-zone">
+                        <div class="drop-zone-content">
+                            <span class="drop-icon">📄</span>
+                            <p class="drop-text">拖拽文件到此处，或 <span class="click-upload">点击上传</span></p>
+                            <p class="drop-hint">支持 .txt, .csv, .xlsx 格式，可多选</p>
+                        </div>
+                        <input type="file" id="fileInput" accept=".txt,.csv,.xlsx" multiple>
+                    </div>
+                    <!-- 已选文件列表 -->
+                    <div id="fileList" class="file-list" style="display: none;">
+                        <div class="file-list-header">
+                            <span>已选文件</span>
+                            <button id="clearFilesBtn" class="btn-clear" onclick="clearFiles()">清空</button>
+                        </div>
+                        <div id="fileListContent" class="file-list-content"></div>
+                    </div>
+                    <div class="button-row">
+                        <button id="uploadBtn" class="btn btn-primary" onclick="handleFileUpload()">开始分析</button>
+                    </div>
+                </div>
             </section>
 
             <!-- 加载中 -->
             <div class="loading" id="loadingIndicator" style="display:none;">
                 <div class="spinner"></div>
-                <p>正在分析中，请稍候...</p>
+                <p id="loadingText">正在分析中，请稍候...</p>
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <span id="progressPercent">0%</span>
+                </div>
             </div>
 
             <!-- 错误提示 -->
@@ -49,6 +84,55 @@
 
             <!-- ====== 结果区域 ====== -->
             <section class="results-section" id="resultsSection" style="display:none;">
+
+                <!-- 工具栏 -->
+                <div class="results-toolbar">
+                    <h2 class="toolbar-title">分析结果</h2>
+                    <div class="toolbar-actions">
+                        <button class="toolbar-btn" onclick="stashCurrentResults()" title="暂存当前结果">
+                            <span>📌</span> 暂存结果
+                        </button>
+                        <button class="toolbar-btn" onclick="showStashList()" title="查看已暂存列表">
+                            <span>📋</span> 已暂存 (<span id="stashCount">0</span>)
+                        </button>
+                        <div class="export-dropdown">
+                            <button class="toolbar-btn dropdown-toggle" onclick="toggleExportMenu()">
+                                <span>📥</span> 导出数据
+                            </button>
+                            <div class="dropdown-menu" id="exportMenu">
+                                <button onclick="exportToExcel()">导出 Excel</button>
+                                <button onclick="exportToCSV()">导出 CSV</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 累计统计 -->
+                <div class="cumulative-section" id="cumulativeSection">
+                    <h2>累计统计</h2>
+                    <div class="cumulative-stats" id="cumulativeStats">
+                        <div class="stat-item">
+                            <span class="stat-value">0</span>
+                            <span class="stat-label">分析次数</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">0</span>
+                            <span class="stat-label">累计评论</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">0</span>
+                            <span class="stat-label">累计维度</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">0</span>
+                            <span class="stat-label">累计正向</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value">0</span>
+                            <span class="stat-label">累计负向</span>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- 概览卡片 -->
                 <h2>分析概览</h2>
@@ -74,8 +158,15 @@
 
                 <!-- 5 个一级维度统计 -->
                 <h2>一级维度分析</h2>
-                <div class="chart-wrapper">
-                    <canvas id="groupChart"></canvas>
+                <div class="charts-container">
+                    <div class="chart-wrapper radar-chart-wrapper">
+                        <h3>维度好评率雷达图</h3>
+                        <canvas id="radarChart"></canvas>
+                    </div>
+                    <div class="chart-wrapper bar-chart-wrapper">
+                        <h3>维度情感分布柱状图</h3>
+                        <canvas id="groupChart"></canvas>
+                    </div>
                 </div>
                 <div id="groupDetail" class="group-detail"></div>
 
@@ -87,9 +178,48 @@
 
                 <!-- 评论详情列表 -->
                 <h2>评论详情</h2>
+                <!-- 筛选控件 -->
+                <div class="filter-controls">
+                    <div class="filter-search">
+                        <input type="text" id="searchInput" placeholder="搜索关键词..." onkeyup="filterReviews()">
+                    </div>
+                    <div class="filter-buttons">
+                        <button class="filter-btn active" onclick="setSentimentFilter('all')">全部</button>
+                        <button class="filter-btn" onclick="setSentimentFilter('positive')">正向</button>
+                        <button class="filter-btn" onclick="setSentimentFilter('neutral')">中性</button>
+                        <button class="filter-btn" onclick="setSentimentFilter('negative')">负向</button>
+                    </div>
+                    <div class="filter-info">
+                        <span id="filterCount">显示 0 条</span>
+                    </div>
+                </div>
                 <div class="reviews-list" id="reviewsList"></div>
+                <!-- 分页控件 -->
+                <div class="pagination" id="pagination" style="display: none;">
+                    <button class="page-btn" onclick="prevPage()">上一页</button>
+                    <span id="pageInfo">第 1 页</span>
+                    <button class="page-btn" onclick="nextPage()">下一页</button>
+                </div>
             </section>
         </main>
+    </div>
+
+    <!-- 暂存列表模态框 -->
+    <div class="modal-overlay" id="stashModal" onclick="closeStashModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3>已暂存的分析结果</h3>
+                <button class="modal-close" onclick="closeStashModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="stashList" class="stash-list"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="loadAllStashed()">加载全部</button>
+                <button class="btn btn-primary" onclick="exportStashedToExcel()">导出全部</button>
+                <button class="btn btn-danger" onclick="clearAllStashed()">清空暂存</button>
+            </div>
+        </div>
     </div>
 
     <script src="/static/js/main.js"></script>

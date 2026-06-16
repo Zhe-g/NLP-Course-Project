@@ -73,11 +73,15 @@ class SentimentAnalyzer:
             return {"text": text, "aspects": [], "summary": _empty_summary(),
                     "error": str(e)}
 
-    def analyze_file(self, filepath: str) -> dict:
+    def analyze_file(self, filepath: str, progress_callback=None) -> dict:
         """
         批量文件分析 — 逐条调用模型 API
 
         支持: TXT (每行一条评论), CSV, XLSX
+        
+        Args:
+            filepath: 文件路径
+            progress_callback: 进度回调函数 (current, total, message)
         """
         # 读取文件
         ext = os.path.splitext(filepath)[1].lower()
@@ -105,10 +109,19 @@ class SentimentAnalyzer:
 
         # 逐条分析
         results = []
+        total = len(reviews)
+        if progress_callback:
+            progress_callback(0, total, '开始分析...')
+        
         for i, review in enumerate(reviews):
             result = self.analyze_text(review)
             result["index"] = i
             results.append(result)
+            
+            # 更新进度
+            if progress_callback:
+                progress = i + 1
+                progress_callback(progress, total, f'正在分析第 {progress}/{total} 条评论...')
 
         # ===== 多维度汇总统计 =====
         summary = _compute_multi_dimension_summary(results)
@@ -118,13 +131,26 @@ class SentimentAnalyzer:
             'results': results,
         }
 
-    def analyze_texts(self, texts: list[str]) -> dict:
-        """批量分析多条文本"""
+    def analyze_texts(self, texts: list[str], progress_callback=None) -> dict:
+        """批量分析多条文本
+        
+        Args:
+            texts: 文本列表
+            progress_callback: 进度回调函数 (current, total, message)
+        """
         results = []
+        total = len(texts)
+        if progress_callback:
+            progress_callback(0, total, '开始分析...')
+        
         for i, text in enumerate(texts):
             result = self.analyze_text(text)
             result["index"] = i
             results.append(result)
+            
+            if progress_callback:
+                progress = i + 1
+                progress_callback(progress, total, f'正在分析第 {progress}/{total} 条评论...')
 
         summary = _compute_multi_dimension_summary(results)
         return {

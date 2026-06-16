@@ -4,8 +4,26 @@
 """
 import torch
 import torch.nn as nn
-from transformers import AutoModel, AutoConfig
-from src.config import PRETRAINED_MODEL, ASPECT_CONFIG
+
+# 延迟导入
+_AutoModel = None
+_AutoConfig = None
+
+
+def _get_auto_model():
+    global _AutoModel
+    if _AutoModel is None:
+        from transformers import AutoModel
+        _AutoModel = AutoModel
+    return _AutoModel
+
+
+def _get_auto_config():
+    global _AutoConfig
+    if _AutoConfig is None:
+        from transformers import AutoConfig
+        _AutoConfig = AutoConfig
+    return _AutoConfig
 
 
 class AspectDetectionModel(nn.Module):
@@ -13,11 +31,18 @@ class AspectDetectionModel(nn.Module):
     RoBERTa-wwm-ext Encoder → [CLS] → Dropout → Linear(768,256) → GELU → Linear(256,18) → Sigmoid
     """
 
-    def __init__(self, pretrained_model: str = PRETRAINED_MODEL, num_labels: int = None):
+    def __init__(self, pretrained_model: str = None, num_labels: int = None):
         super().__init__()
+        
+        from src.config import PRETRAINED_MODEL, ASPECT_CONFIG
+        if pretrained_model is None:
+            pretrained_model = PRETRAINED_MODEL
         if num_labels is None:
             num_labels = ASPECT_CONFIG["num_labels"]
 
+        AutoConfig = _get_auto_config()
+        AutoModel = _get_auto_model()
+        
         self.config = AutoConfig.from_pretrained(pretrained_model)
         self.encoder = AutoModel.from_pretrained(pretrained_model)
 

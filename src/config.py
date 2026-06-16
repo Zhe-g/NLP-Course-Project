@@ -28,7 +28,12 @@ ASPECT_MODEL_PATH = os.path.join(MODEL_DIR, "aspect_detection")
 SENTIMENT_MODEL_PATH = os.path.join(MODEL_DIR, "sentiment")
 
 # --- 设备配置 ---
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def get_device():
+    """获取设备"""
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# 设备常量（导入时初始化）
+DEVICE = get_device()
 
 # --- 预训练模型配置 ---
 PRETRAINED_MODEL = "hfl/chinese-roberta-wwm-ext"
