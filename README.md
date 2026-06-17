@@ -104,7 +104,7 @@ python scripts/train_all.py
 **方式一：一键启动（推荐）**
 
 ```bash
-python FINAL/FINAL/main.py
+python FINAL/main.py
 # 自动启动 API(:5000) + Web界面(:5001) + 打开浏览器
 ```
 
@@ -115,7 +115,7 @@ python FINAL/FINAL/main.py
 python scripts/run_api.py --port 5000
 
 # 终端 2：Web 界面
-cd FINAL/FINAL && python app.py
+cd FINAL && python app.py
 # 浏览器打开 http://localhost:5001
 ```
 
@@ -204,8 +204,7 @@ NLPHomework/
 │   ├── analysis/                 # 统计分析
 │   │   └── aggregator.py         #   多维度统计汇总
 │   └── api/                      # Flask 模型API
-│       ├── app.py                #   应用入口 + 路由
-│       └── routes.py             #   路由扩展点
+│       └── app.py                #   应用入口 + 路由
 │
 ├── scripts/                      # 一键脚本
 │   ├── preprocess_data.py        # 数据清洗
@@ -214,12 +213,11 @@ NLPHomework/
 │   └── test_pipeline.py          # 端到端测试
 │
 ├── FINAL/                        # Web 可视化界面
-│   └── FINAL/
-│       ├── main.py               #   一键启动双服务
-│       ├── app.py                #   Flask Web 应用
-│       ├── sentiment_analyzer.py #   模型 API 客户端
-│       ├── templates/index.html  #   前端页面
-│       └── static/               #   CSS + JS (Chart.js)
+│   ├── main.py                   #   一键启动双服务
+│   ├── app.py                    #   Flask Web 应用
+│   ├── sentiment_analyzer.py     #   模型 API 客户端
+│   ├── templates/index.html      #   前端页面
+│   └── static/                   #   CSS + JS (Chart.js)
 │
 ├── data/
 │   ├── asap/                     # 原始 ASAP 数据集

@@ -99,7 +99,6 @@ NLPHomework/
 │   │   ├── train_clean.csv      # 36,844 条 (移除6条无效)
 │   │   ├── dev_clean.csv        # 4,940 条
 │   │   └── test_clean.csv       # 4,938 条 (移除2条无效)
-│   └── stopwords/
 ├── models/                      # 训练好的模型
 │   ├── aspect_detection/        # 属性检测模型（18维多标签分类）
 │   └── sentiment/               # 情感分类模型（3分类）
@@ -122,15 +121,20 @@ NLPHomework/
 │   ├── analysis/                # 统计分析
 │   │   └── aggregator.py        # 多维度统计汇总
 │   └── api/                     # Flask API
-│       ├── app.py               # 应用入口 + 路由
-│       └── routes.py            # 路由扩展点
+│       └── app.py               # 应用入口 + 路由
 ├── scripts/
 │   ├── preprocess_data.py       # 数据清洗脚本
-│   ├── train_aspect.py          # 单独训练属性检测
-│   ├── train_sentiment.py       # 单独训练情感分类
 │   ├── train_all.py             # 一键训练全部模型
-│   ├── run_api.py               # 启动 Flask 服务
+│   ├── run_api.py               # 启动 Flask 服务（懒加载版）
+│   ├── evaluate.py              # 模型评估（Precision/Recall/F1）
 │   └── test_pipeline.py         # 端到端测试
+├── FINAL/                       # Web 可视化界面
+│   ├── main.py                  # 一键启动双服务
+│   ├── app.py                   # Flask Web 应用 (port 5001)
+│   ├── sentiment_analyzer.py    # 模型 API HTTP 客户端
+│   ├── start_backend.bat        # Windows 启动脚本
+│   ├── templates/index.html     # 前端页面
+│   └── static/                  # CSS + JS + Chart.js
 ├── API_DOC.md                   # 接口文档
 ├── WORK_LOG.md                  # 本文件：工作日志
 ├── environment.yml
@@ -435,11 +439,409 @@ POST /api/v1/analyze {"text":"味道不错，服务很好，环境优雅"}
 | `src/sentiment/train.py` | 148 | 训练脚本 |
 | `src/sentiment/predict.py` | 88 | 推理 |
 | `src/pipeline/analyzer.py` | 121 | 推理流水线 |
-| `src/analysis/aggregator.py` | 97 | 统计分析 |
-| `src/api/app.py` | 137 | Flask API + 路由 |
+| `src/analysis/aggregator.py` | 114 | 统计分析 |
+| `src/api/app.py` | 160+ | Flask API 入口 + 路由（唯一路由定义处） |
 | `scripts/preprocess_data.py` | 72 | 数据清洗脚本 |
-| `scripts/train_all.py` | 40 | 一键训练 |
-| `scripts/run_api.py` | 28 | 启动API |
+| `scripts/train_all.py` | 40 | 一键训练全部模型 |
+| `scripts/evaluate.py` | 166 | 模型评估（Precision/Recall/F1） |
+| `scripts/run_api.py` | 50 | API 懒加载启动器（路由来自 src.api.app） |
 | `scripts/test_pipeline.py` | 138 | 端到端测试 |
+| `FINAL/app.py` | 160+ | Web UI 入口 (port 5001) |
+| `FINAL/sentiment_analyzer.py` | 283 | 模型 API HTTP 客户端 + 统计汇总 |
+| `FINAL/main.py` | 117 | 一键启动双服务 |
 | `API_DOC.md` | - | 接口文档 |
 | `WORK_LOG.md` | - | 本文件 |
+
+---
+
+## 11. 后端同学 FINAL 项目评估 (2026-06-09 ~ 2026-06-10)
+
+### 11.1 评估 FINAL 完成度
+
+后端同学提交的 FINAL 项目位于 `FINAL/`，包含一个独立的 Web UI。分析了其代码后，评估如下：
+
+**已完成的（约 40%）**：
+- UI 界面框架：HTML + CSS + Chart.js，美观度不错
+- 评论批量导入：支持单文件/多文件上传、拖拽、手动输入，TXT/CSV/XLSX
+- 基础情感分类：SnowNLP + jieba 关键词匹配做正/负/中三分类
+
+**未完成/问题**：
+- **没有对接我们的模型**：用的是 SnowNLP 规则方法，不是 RoBERTa 深度学习模型
+- **没有 18 维多维度**：只做正/负/中三分类，没有按 18 个维度分析
+- **`app.py` 缺失**（但后来发现有旧版）
+- **`init_db.py` 缺失**
+- **`requirements.txt` 缺失**
+- 启动脚本 `start_backend.bat` 引用不存在的文件
+
+**决策**: 保留前端框架，干掉 SnowNLP，全部走我们训练的模型 API。
+
+### 11.2 FINAL 改造 — SnowNLP → 模型 API
+
+改造了 5 个文件：
+
+**1. `sentiment_analyzer.py`** — 全量重写
+- 删除所有 SnowNLP、jieba 关键词词表（~70 行规则代码）
+- 改为 HTTP 调用我们的模型 API：`GET /api/v1/taxonomy`、`POST /api/v1/analyze`
+- 新增 `_compute_multi_dimension_summary()` — 18 维多维度汇总：
+  - 整体评论情感分布
+  - 5 个一级维度（位置/服务/价格/环境/菜品）统计
+  - 18 个具体维度好评率排名
+- 新依赖：`requests`（调用模型 API）
+
+**2. `app.py`** — Flask 入口重写
+- 端口从 5000（与模型 API 冲突）改为 5001
+- 移除 `flask_cors` 依赖
+- 简化路由：只保留 `/upload`、`/batch-upload`、`/input-text`、`/health`
+- 上传文件分析后自动清理临时文件
+- 旧版中保存 JSON 到磁盘的逻辑全部移除
+
+**3. `templates/index.html`** — 前端页面改造
+- 新增模型状态指示器（绿色/红色圆点显示 API 连接状态）
+- 新增 5 个概览卡片：总评论数、总维度数、平均维度/条、正向评论、负向评论
+- 新增 4 个图表区域：
+  - 评论整体情感饼图
+  - 评价维度情感饼图
+  - 5 个一级维度分组堆叠柱状图
+  - 18 维度好评率排名水平柱状图
+- 新增评论详情列表，每条评论显示所有检测到的维度标签
+
+**4. `static/js/main.js`** — 前端逻辑重写
+- 新增 `checkModelHealth()` — 页面加载时检测模型 API 连接状态
+- `handleTextAnalysis()` — 调用 `/input-text`，将单条结果包装成批量格式统一渲染
+- `updateSummary()` — 更新 5 张概览卡片
+- `updateCharts()` — 渲染 4 个 Chart.js 图表：饼图×2、堆叠柱状图、水平排名图
+- `updateGroupDetail()` — 渲染 5 个一级维度的统计卡片
+- `updateReviewsList()` — 每条评论显示维度标签（as aspect-tag badges）
+- `_buildGroupStats()` / `_buildCategoryRankings()` — 单条评论输入时在前端计算统计
+
+**5. `static/css/style.css`** — 新增样式
+- `.model-status` — 模型状态指示器
+- `.group-detail` / `.group-card` — 一级维度统计卡片
+- `.aspect-tag` — 维度标签（绿色正向/红色负向/蓝色中性）
+- `.chart-wrapper.full` — 全宽图表
+
+### 11.3 新增 main.py — 一键启动双服务
+
+`FINAL/main.py`：
+- 自动启动模型 API (:5000) + Web 界面 (:5001)
+- 等待 API 就绪后再启动 Web，避免空请求
+- 自动打开浏览器到 `http://localhost:5001`
+- Ctrl+C 一键停止两个服务
+- 备选：双击 `start_backend.bat` 也可启动
+
+### 11.4 FINAL 冗余文件清理
+
+删除了 FINAL 中的旧文件：
+- `sentiment_analyzer_advanced.py` — 旧版分析器（含 api_key 占位符）
+- `api_examples.py` — 旧版 API 示例
+- `config_template.json` — 旧配置模板
+- `本地模型使用指南.md` — 过时文档
+- `测试报告.md` — 过时文档
+
+---
+
+## 12. 项目清理 (2026-06-10)
+
+### 12.1 删除冗余大目录
+
+| 删除项 | 大小 | 原因 |
+|--------|------|------|
+| `ABSA_system-master/` | ~几十MB | 旧英文项目，不参与运行 |
+| `asap-master/` | ~几十MB | 数据已复制到 `data/asap/` |
+| `FINAL/FINAL/.venv/` | ~几百MB | 虚拟环境，conda 已够用 |
+| `models/*/checkpoint-*/` | ~400MB×2组 | 训练中间产物，最终模型已保存 |
+| `scripts/train_aspect.py` | 重复 | `train_all.py` 覆盖 |
+| `scripts/train_sentiment.py` | 重复 | `train_all.py` 覆盖 |
+
+清理后总大小：~2GB → **867MB**（其中 782MB 是两个 RoBERTa 模型权重，代码+数据 85MB）
+
+---
+
+## 13. README.md 撰写 (2026-06-10)
+
+写了完整的 README.md，包含：
+- 项目概述 + ASCII 系统架构图
+- 18 维度速查表（中英文对照）
+- 快速开始（5 步：环境 → 清洗 → 训练 → 启动 → 测试）
+- API 接口表 + 请求/响应 JSON 示例
+- 完整项目结构树
+- 训练数据说明（ASAP 论文引用）
+- 技术栈总览 + 两个模型的详细配置表
+
+---
+
+## 14. GitHub 推送 (2026-06-10)
+
+### 14.1 问题：模型文件超过 GitHub 100MB 限制
+
+- `models/aspect_detection/model.safetensors` — 390MB
+- `models/sentiment/model.safetensors` — 390MB
+- GitHub pre-receive hook 拒绝推送
+
+### 14.2 解决步骤
+
+1. 创建 `.gitignore`，排除 `data/`、`models/`、`__pycache__/` 等
+2. 用 `git rm --cached` 移除已追踪的大文件
+3. 由于大文件在历史 commit 中，GitHub 仍然拒绝
+4. 删除 `.git` 重新初始化仓库
+5. 只 add 源码文件（57 个文件），排除模型和数据
+6. 创建干净 commit，force push 到 main
+
+### 14.3 安全审查
+
+推送前扫描了敏感信息：
+- **绝对路径**：`start_backend.bat` 中 `E:\programingCodeFile\...` 改为相对路径
+- **文档路径**：`API_DOC.md`、`WORK_LOG.md` 中本地路径替换为通用路径
+- **旧文件**：含 `api_key` 占位符的旧文件已删除
+- **敏感信息**：全项目 grep `password`、`api_key`、`secret` — 无泄露
+
+---
+
+## 15. sentint_analyzer.py Bug 修复 — category_zh 全显示同一个维度 (2026-06-10)
+
+### 15.1 表现
+
+Web 界面的"18 维度好评率排名"图表中，所有维度的中文名都显示为"装修风格"。
+
+### 15.2 根因
+
+`_compute_multi_dimension_summary()` 第 212 行：
+
+```python
+# 错误: 对每个 cat 都使用了 all_aspects[0] 的 category_zh
+"category_zh": all_aspects[0].get("category_zh", cat) if all_aspects else cat,
+```
+
+`all_aspects[0]` 写死了第一个 aspect 的中文名，导致所有 18 个维度都被标记为第一个维度的名称（如"装修风格"）。
+
+### 15.3 修复
+
+```python
+# 正确: 按当前 cat 查找对应的 category_zh
+cat_zh = cat  # fallback
+for a in all_aspects:
+    if a.get("category") == cat:
+        cat_zh = a.get("category_zh", cat)
+        break
+```
+
+---
+
+## 16. 模型评估实验 (2026-06-10)
+
+### 16.1 新增 evaluate.py
+
+`scripts/evaluate.py` — 在测试集上计算 Precision、Recall、F1。
+
+### 16.2 属性检测模型结果（18维多标签，测试集 4,938 条）
+
+| 指标 | 值 |
+|------|-----|
+| Micro-Precision | 0.8555 |
+| Micro-Recall | 0.8094 |
+| **Micro-F1** | **0.8318** |
+| **Macro-F1** | **0.7965** |
+
+Top 5 维度（F1）：
+1. 菜品口味: 0.9741
+2. 装修风格: 0.8834
+3. 停车便利: 0.8719
+4. 服务态度: 0.8682
+5. 交通便利: 0.8611
+
+Bottom 3 维度（F1）：
+1. 菜品外观: 0.5602（Recall 低，容易被遗漏）
+2. 是否推荐: 0.6446
+3. 性价比: 0.6985
+
+### 16.3 情感分类模型结果（3分类，测试集 28,356 条）
+
+| 指标 | 值 |
+|------|-----|
+| **Accuracy** | **0.8089** |
+| **Macro-F1** | **0.7503** |
+| **Weighted-F1** | **0.8041** |
+
+各类别 F1：
+- 正向: 0.8870（多数类，表现最好）
+- 负向: 0.7223
+- 中性: 0.6418（少数类，表现最差）
+
+---
+
+## 17. 其他修复 (2026-06-10)
+
+### 17.1 requirements.txt 重写
+- 移除 `peft`（未使用 LoRA）
+- 移除 `transformers==4.36.0` 版本锁定
+- 新增 `requests`（FINAL Web 界面需要）
+
+### 17.2 API 懒加载优化（用户自行修改）
+- `run_api.py` 改为懒加载模式：先导入 Flask → 再加载模型
+- `src/api/app.py` 拆分为路由定义 + `set_analyzer()` 外部注入
+- `src/aspect_detection/predict.py` 和 `src/sentiment/predict.py` 改为延迟导入 transformers
+
+### 17.3 LF/CRLF 警告说明
+Git 在 Windows 上默认 `core.autocrlf=true`，会将 LF 转为 CRLF。"LF will be replaced by CRLF" 警告不影响代码运行，是 Git 的格式统一行为。
+
+### 17.4 多线程使用情况
+- Flask `threaded=True` — 处理并发 HTTP 请求
+- `main.py` `threading.Thread` — 后台读取子进程输出
+- PyTorch `dataloader_num_workers=2` — 训练时多进程数据加载
+- 推理流水线是单线程串行，不存在竞态条件
+
+---
+
+## 18. 前端页面优化 (2026-06-16)
+
+> Author: hxy · Commit: `29955be` · 12 files changed, +2693/-170 lines
+
+### 18.1 改动概览
+
+前端同学对 Web UI 进行了大幅功能增强，涉及 12 个文件：
+
+| 文件 | 改动量 | 说明 |
+|------|--------|------|
+| `FINAL/FINAL/static/js/main.js` | +1370/-? | 前端逻辑从 ~200 行暴增到 ~1400 行 |
+| `FINAL/FINAL/static/css/style.css` | +949/-? | 样式从 ~200 行扩展到 ~1100 行 |
+| `FINAL/FINAL/templates/index.html` | +164/-? | 新增大量 UI 组件 |
+| `FINAL/FINAL/app.py` | +79/-? | 后端适配新前端功能 |
+| `FINAL/FINAL/sentiment_analyzer.py` | +32/-? | 增强返回数据结构 |
+| `scripts/run_api.py` | +85/-? | 后端配合 |
+| `src/api/app.py` | +15/-? | 后端配合 |
+| `src/aspect_detection/model.py` | +31/-? | 模型层配合 |
+| `src/aspect_detection/predict.py` | +49/-? | 推理配合 |
+| `src/sentiment/model.py` | +31/-? | 模型层配合 |
+| `src/sentiment/predict.py` | +51/-? | 推理配合 |
+| `src/config.py` | +7/-? | 配置配合 |
+
+### 18.2 前端新增功能
+
+#### 18.2.1 模式切换
+- 新增"手动输入"和"文件上传"两个选项卡，用户可自由切换
+- 默认显示手动输入面板，文件上传面板隐藏
+
+#### 18.2.2 文件管理增强
+- 支持拖拽上传 + 点击选择文件（TXT/CSV/XLSX）
+- 文件列表可视化显示：文件名、文件大小、文件图标
+- 支持逐项删除和"清空"按钮
+- `formatFileSize()` 格式化文件大小（B/KB/MB）
+
+#### 18.2.3 上传进度条
+- 批量上传使用 XHR + SSE 流式进度事件
+- `uploadMultipleWithProgress()` 实时解析 `data:` 事件更新进度条
+- 进度条显示百分比 + 文字描述（"正在处理文件: xxx"）
+- 后端 `batch_upload` 改为 `stream_with_context` + SSE 格式响应
+
+#### 18.2.4 累计统计面板
+- 使用 `localStorage` 持久化历史分析累计数据
+- 显示：分析次数、累计评论数、累计维度数、累计正向数、累计负向数
+- 数据持久化到浏览器本地存储，跨次分析累加
+
+#### 18.2.5 图表布局重构
+- 原来单一的柱状图 → 改为 **雷达图 + 柱状图** 并排布局
+- `drawRadarChart()` — 5 个一级维度好评率雷达图
+- 柱状图展示各维度情感分布（正/中/负堆叠）
+
+#### 18.2.6 筛选与搜索
+- 关键词搜索输入框，实时过滤评论列表
+- 按情感标签筛选：全部 / 正向 / 中性 / 负向
+- 筛选按钮高亮当前激活的过滤状态
+- 显示"显示 X 条"计数
+
+#### 18.2.7 评论列表分页
+- 分页变量：`currentPage=1`, `pageSize=10`
+- 分页控件：上一页 / 第 X 页 / 下一页
+- 自动根据筛选后的结果重新计算页数
+
+#### 18.2.8 暂存列表
+- "暂存结果"按钮将当前分析结果保存到 `localStorage`
+- 模态框展示已暂存的记录列表（编号、文件名、维度数、评论数）
+- 支持逐项删除暂存记录
+- 关闭模态框（点击遮罩层、×按钮、ESC键）
+
+#### 18.2.9 导出功能
+- 新增导出下拉菜单（"导出 Excel" / "导出 CSV"）
+- 引入 SheetJS (xlsx@0.18.5) CDN
+- `exportToExcel()` — 导出 .xlsx 格式，含详情 Sheet + 汇总 Sheet
+- `exportToCSV()` — 导出 .csv 格式
+
+#### 18.2.10 后端适配
+- `batch_upload()` 改为 SSE 流式响应（`text/event-stream`），每个文件处理完成推送进度事件
+- `analyze_file()` 返回值新增 `sentiment_counts`、`dimension_stats` 等字段
+- `_compute_multi_dimension_summary()` 增强，新增 `average_aspects`、`review_level_sentiment` 等统计
+
+---
+
+## 19. 项目冗余清理 (2026-06-17)
+
+> AI 辅助清理，共删除 234 行，新增 37 行，净减 ~200 行
+
+### 19.1 API 路由重复消除
+
+**问题**：`scripts/run_api.py` (101 行) 和 `src/api/app.py` (161 行) 各自独立定义了相同的 6 个 API 路由（health/taxonomy/analyze/batch/stats/reset），任何 API 改动需要同步两个文件。
+
+**修复内容**：
+
+1. **重写 `scripts/run_api.py`** (101→50 行)：
+   - 改为从 `src/api.app` 导入 `app` 和 `set_analyzer`
+   - 仅保留懒加载 + 启动逻辑，路由定义不再重复
+   - `init_analyzer()` 在启动前完成模型加载，调用 `set_analyzer()` 注入
+
+2. **修复 `src/api/app.py`**：
+   - 移除未使用的 `from src.pipeline.analyzer import ABSAAnalyzer` 导入（analyse 类从未在此文件中实例化，由 `set_analyzer()` 外部注入）
+   - 修复 `__main__` 入口：新增懒加载初始化（之前直接 `app.run()` 会因为 `_analyzer is None` 在首次请求报错）
+
+### 19.2 死代码删除
+
+| 删除文件 | 行数 | 原因 |
+|----------|------|------|
+| `src/api/routes.py` | 10 | 空壳扩展点，全项目零 import |
+| `FINAL/FINAL/simple_test.py` | 134 | 与 `test_system.py` 功能重复，且使用旧接口路径 `/input-text` |
+
+对应更新了 `README.md` 和 `WORK_LOG.md` 中的目录结构文档。
+
+### 19.3 空目录和死配置清理
+
+- **删除 `data/stopwords/`**：空目录，git 未跟踪任何文件
+- **删除 `config.py` 中的 `STOPWORDS_DIR`**：全项目零引用
+
+### 19.4 FINAL/FINAL/ 双层嵌套扁平化
+
+**问题**：`FINAL/FINAL/` 外层 `FINAL/` 只是空壳容器，所有文件在内层 `FINAL/FINAL/`，增加了不必要的目录深度。
+
+**修复**：`FINAL/FINAL/*` → `FINAL/*`，共 21 个文件。
+
+**连带修复的路径引用**：
+
+| 文件 | 改动 |
+|------|------|
+| `FINAL/main.py:12` | `BASE_DIR` 从 3 层 `dirname` 改为 2 层 |
+| `FINAL/start_backend.bat:10` | `PROJECT_ROOT` 从 `%~dp0..\..` 改为 `%~dp0..` |
+| `README.md:107,118` | `FINAL/FINAL/main.py` → `FINAL/main.py` |
+| `README.md:215-221` | 项目结构树中移除嵌套层 |
+
+### 19.5 清理统计
+
+```
+ FINAL/FINAL/simple_test.py | 134 行删除
+ FINAL/main.py              |   2 行修改
+ FINAL/start_backend.bat    |   4 行修改
+ README.md                  |  18 行修改
+ WORK_LOG.md                |   3 行修改
+ scripts/run_api.py         |  93 行重写 (101→50)
+ src/api/app.py             |   6 行修改
+ src/api/routes.py          |  10 行删除
+ src/config.py              |   1 行删除
+ ─────────────────────────────────
+ 9 files, +37 / -234, 净减 ~200 行
+```
+
+### 19.6 未处理但已知的冗余
+
+以下问题已知但未在本次处理，留给后续决策：
+
+- **统计逻辑重复**：`FINAL/sentiment_analyzer.py::_compute_multi_dimension_summary()` 与 `src/analysis/aggregator.py::compute_stats()` 实现相同功能，Web UI 应通过 API 获取统计而非本地重算
+- **文件读取列检测重复**：CSV/XLSX review 列名匹配逻辑在 `FINAL/app.py` 和 `FINAL/sentiment_analyzer.py` 中各有一份
+- **`FINAL/uploads/` 中的临时文件**：测试上传残留，可安全清理
+- `FINAL/FINAL/` 在 git 历史中仍作为 `git mv` rename 记录存在

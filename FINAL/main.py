@@ -9,7 +9,7 @@ import time
 import threading
 import webbrowser
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODEL_API_SCRIPT = os.path.join(BASE_DIR, "scripts", "run_api.py")
 WEB_APP_FILE = os.path.join(os.path.dirname(__file__), "app.py")
 

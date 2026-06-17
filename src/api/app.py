@@ -9,7 +9,6 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from flask import Flask, request, jsonify
-from src.pipeline.analyzer import ABSAAnalyzer
 from src.taxonomy.categories import get_all_categories
 from src.analysis.aggregator import StatisticsAggregator
 
@@ -152,6 +151,11 @@ if __name__ == "__main__":
     parser.add_argument("--port", type=int, default=5000, help="监听端口")
     parser.add_argument("--debug", action="store_true", help="调试模式")
     args = parser.parse_args()
+
+    # 预加载分析器
+    print("Loading ABSA Analyzer...")
+    from src.pipeline.analyzer import ABSAAnalyzer
+    set_analyzer(ABSAAnalyzer())
 
     print("=" * 50)
     print("  ABSA 情感分析 API 服务")

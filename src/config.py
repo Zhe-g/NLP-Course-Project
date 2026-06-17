@@ -10,7 +10,6 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 ASAP_DIR = os.path.join(DATA_DIR, "asap")
 PROCESSED_DIR = os.path.join(DATA_DIR, "processed")
-STOPWORDS_DIR = os.path.join(DATA_DIR, "stopwords")
 MODEL_DIR = os.path.join(BASE_DIR, "models")
 
 # ASAP 数据文件路径（原始）
