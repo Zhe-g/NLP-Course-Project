@@ -10,6 +10,11 @@
 </head>
 <body>
     <div class="container">
+        <!-- 侧栏切换按钮 -->
+        <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="历史报告">
+            <span class="toggle-icon">☰</span>
+        </button>
+
         <header>
             <h1>ABSA 细粒度情感分析系统</h1>
             <p class="subtitle">基于 RoBERTa 模型的 18 维度属性级情感分析</p>
@@ -17,6 +22,23 @@
                 <span class="dot"></span> 模型服务检测中...
             </div>
         </header>
+
+        <!-- 侧栏遮罩 -->
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+        <!-- 历史报告侧栏 -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h3>📋 历史报告</h3>
+                <button class="sidebar-close" onclick="closeSidebar()">×</button>
+            </div>
+            <div class="sidebar-body" id="sidebarBody">
+                <div class="sidebar-empty">暂无历史报告<br><small>分析评论后自动保存</small></div>
+            </div>
+            <div class="sidebar-footer">
+                <button class="btn btn-danger btn-sm" onclick="clearHistoryReports()" style="width:100%;">🗑️ 清空全部记录</button>
+            </div>
+        </aside>
 
         <main>
             <!-- 输入区域 -->
@@ -69,12 +91,6 @@
             <div class="loading" id="loadingIndicator" style="display:none;">
                 <div class="spinner"></div>
                 <p id="loadingText">正在分析中，请稍候...</p>
-                <div class="progress-container">
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progressFill"></div>
-                    </div>
-                    <span id="progressPercent">0%</span>
-                </div>
             </div>
 
             <!-- 错误提示 -->

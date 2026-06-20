@@ -6,6 +6,9 @@ SnowNLP 已彻底移除，全部走模型
 """
 import os
 import json
+import uuid
+import threading
+import queue
 from flask import Flask, render_template, request, jsonify, Response, stream_with_context
 from werkzeug.utils import secure_filename
 from sentiment_analyzer import SentimentAnalyzer
@@ -15,6 +18,13 @@ app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16MB
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# 清理上次运行遗留的未删除临时文件
+for _old_file in os.listdir(UPLOAD_FOLDER):
+    try:
+        os.remove(os.path.join(UPLOAD_FOLDER, _old_file))
+    except Exception:
+        pass
 
 analyzer = SentimentAnalyzer()
 
@@ -35,13 +45,16 @@ def upload():
     if not file.filename:
         return jsonify({"error": "文件名为空"}), 400
 
-    filepath = os.path.join(UPLOAD_FOLDER, secure_filename(file.filename or "upload.tmp"))
+    # 加唯一后缀避免同名文件并发冲突
+    raw_name = secure_filename(file.filename or "upload.tmp")
+    unique_name = f"{uuid.uuid4().hex[:8]}_{raw_name}"
+    filepath = os.path.join(UPLOAD_FOLDER, unique_name)
     file.save(filepath)
 
     try:
         result = analyzer.analyze_file(filepath)
     finally:
-        os.remove(filepath)
+        _safe_remove(filepath)
 
     if "error" in result:
         return jsonify(result), 400
@@ -69,36 +82,64 @@ def batch_upload():
             filename = f.filename
             yield f"data: {json.dumps({'stage': 'upload', 'current': current_file, 'total': total_files, 'file': filename, 'message': f'正在处理文件: {filename}'})}\n\n"
             
-            filepath = os.path.join(UPLOAD_FOLDER, secure_filename(f.filename or "batch.tmp"))
+            raw_name = secure_filename(f.filename or "batch.tmp")
+            unique_name = f"{uuid.uuid4().hex[:8]}_{raw_name}"
+            filepath = os.path.join(UPLOAD_FOLDER, unique_name)
             f.save(filepath)
-            
+
             try:
-                # 读取文件获取评论数量
-                ext = os.path.splitext(filepath)[1].lower()
-                review_count = 0
-                if ext == '.txt':
-                    with open(filepath, 'r', encoding='utf-8') as f_read:
-                        review_count = len([line for line in f_read if line.strip()])
-                elif ext == '.csv':
-                    df = pd.read_csv(filepath)
-                    text_cols = [c for c in df.columns if c.lower() in ('review', 'text', 'reviewbody', 'content', 'comment')]
-                    col = text_cols[0] if text_cols else df.columns[0]
-                    review_count = len(df[col].dropna())
-                elif ext == '.xlsx':
-                    df = pd.read_excel(filepath)
-                    text_cols = [c for c in df.columns if c.lower() in ('review', 'text', 'reviewbody', 'content', 'comment')]
-                    col = text_cols[0] if text_cols else df.columns[0]
-                    review_count = len(df[col].dropna())
-                
+                # 线程+队列：progress_callback 不再用 yield（生成器不会被 analyze_file 迭代）
+                pq = queue.Queue()
+
                 def progress_callback(current, total, message):
-                    progress = int((current_file - 1) / total_files * 100 + current / total / total_files * 100)
-                    yield f"data: {json.dumps({'stage': 'analyze', 'current': current, 'total': total, 'file': filename, 'progress': progress, 'message': message})}\n\n"
-                
-                r = analyzer.analyze_file(filepath, progress_callback=progress_callback)
-                if "error" not in r:
-                    all_results.append(r)
+                    pq.put({
+                        'stage': 'analyze',
+                        'current': current,
+                        'total': total,
+                        'file': filename,
+                        'progress': int((current_file - 1) / total_files * 100
+                                        + current / total / total_files * 100),
+                        'message': message,
+                    })
+
+                result_holder = [None]
+                error_holder = [None]
+
+                def _run():
+                    try:
+                        result_holder[0] = analyzer.analyze_file(
+                            filepath, progress_callback=progress_callback
+                        )
+                    except Exception as exc:
+                        error_holder[0] = str(exc)
+
+                t = threading.Thread(target=_run, daemon=True)
+                t.start()
+
+                while t.is_alive():
+                    try:
+                        msg = pq.get(timeout=0.3)
+                        yield f"data: {json.dumps(msg)}\n\n"
+                    except queue.Empty:
+                        yield f"data: {json.dumps({'stage': 'heartbeat'})}\n\n"
+
+                t.join()
+
+                while not pq.empty():
+                    try:
+                        msg = pq.get_nowait()
+                        yield f"data: {json.dumps(msg)}\n\n"
+                    except queue.Empty:
+                        break
+
+                if error_holder[0]:
+                    yield f"data: {json.dumps({'stage': 'error', 'error': error_holder[0]})}\n\n"
+                else:
+                    r = result_holder[0]
+                    if r and "error" not in r:
+                        all_results.append(r)
             finally:
-                os.remove(filepath)
+                _safe_remove(filepath)
         
         # 合并结果
         yield f"data: {json.dumps({'stage': 'merge', 'message': '正在合并分析结果...'})}\n\n"
@@ -137,6 +178,14 @@ def health():
         "model_api": "connected" if model_ok else "disconnected",
         "hint": "请先启动模型API: python scripts/run_api.py --port 5000" if not model_ok else "",
     })
+
+
+def _safe_remove(filepath: str):
+    """安全删除文件 — 文件不存在时静默忽略"""
+    try:
+        os.remove(filepath)
+    except FileNotFoundError:
+        pass  # 已被其他进程删除，无需处理
 
 
 def _merge(batches: list[dict]) -> dict:

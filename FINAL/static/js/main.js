@@ -88,6 +88,16 @@ function initDragDrop() {
             addFiles(files);
         }
     });
+
+    // 点击上传 — 仅当点击未命中 fileInput 原生覆盖层时才手动触发
+    dropZone.addEventListener('click', (e) => {
+        // fileInput 是 opacity:0 的绝对定位层，覆盖整个 dropZone
+        // 绝大多数点击已被原生行为处理，这里只兜底边缘情况（如点击 padding 边缘）
+        if (e.target === fileInput || fileInput.contains(e.target)) {
+            return;  // 原生行为已触发文件选择，跳过避免重复
+        }
+        fileInput.click();
+    });
 }
 
 // ===== 文件选择处理 =====
@@ -186,8 +196,7 @@ async function handleFileUpload() {
     }
 
     showLoading();
-    setProgress(0, '准备上传...');
-    
+
     if (selectedFiles.length === 1) {
         await uploadSingle(selectedFiles[0]);
     } else {
@@ -200,28 +209,19 @@ async function uploadSingle(file) {
     const fd = new FormData();
     fd.append('file', file);
     try {
-        const totalLines = await countLinesInFile(file);
-        let processed = 0;
-        
-        setProgress(0, `正在分析文件: ${file.name}`);
-        
         const resp = await fetch('/upload', { method: 'POST', body: fd });
         const data = await resp.json();
-        
-        // 设置完成状态
-        setProgress(100, '分析完成');
-        
-        if (resp.ok) { 
-            currentData = data; 
-            displayResults(data); 
+
+        if (resp.ok) {
+            currentData = data;
+            displayResults(data);
         }
-        else { 
-            showError(data.error || '分析失败'); 
+        else {
+            showError(data.error || '分析失败');
         }
-    } catch (e) { 
-        showError('网络错误: ' + e.message); 
+    } catch (e) {
+        showError('网络错误: ' + e.message);
     } finally {
-        // 确保隐藏加载状态
         hideLoading();
     }
 }
@@ -235,49 +235,17 @@ async function uploadMultipleWithProgress(files) {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', '/batch-upload');
         
-        // 流式处理响应
-        xhr.onprogress = () => {
-            if (xhr.responseText) {
-                const response = xhr.responseText;
-                const lastNewline = response.lastIndexOf('\n\n');
-                if (lastNewline !== -1) {
-                    const completeEvents = response.substring(0, lastNewline);
-                    const events = completeEvents.split('\n\n').filter(e => e.trim());
-                    
-                    for (const event of events) {
-                        if (event.startsWith('data: ')) {
-                            const dataStr = event.substring(6);
-                            try {
-                                const data = JSON.parse(dataStr);
-                                processProgressEvent(data);
-                            } catch (e) {
-                                console.log('解析事件失败:', e);
-                            }
-                        }
-                    }
-                }
-            }
-        };
-
         xhr.onreadystatechange = () => {
             if (xhr.readyState === XMLHttpRequest.DONE) {
-                // 设置完成状态
-                setProgress(100, '分析完成');
-                
+                hideLoading();
                 if (xhr.status === 200) {
                     try {
-                        const responseText = xhr.responseText;
-                        const events = responseText.split('\n\n').filter(e => e.trim());
-                        
+                        const events = xhr.responseText.split('\n\n').filter(e => e.trim());
                         for (const event of events) {
                             if (event.startsWith('data: ')) {
-                                const dataStr = event.substring(6);
                                 try {
-                                    const data = JSON.parse(dataStr);
-                                    processProgressEvent(data);
-                                } catch (e) {
-                                    console.log('解析事件失败:', e);
-                                }
+                                    processSSEEvent(JSON.parse(event.substring(6)));
+                                } catch (e) {}
                             }
                         }
                     } catch (e) {
@@ -288,9 +256,6 @@ async function uploadMultipleWithProgress(files) {
                     showError('批量分析失败');
                     reject();
                 }
-                
-                // 确保隐藏加载状态
-                hideLoading();
             }
         };
 
@@ -304,23 +269,11 @@ async function uploadMultipleWithProgress(files) {
     });
 }
 
-// 处理进度事件
-function processProgressEvent(data) {
+// 处理 SSE 事件
+function processSSEEvent(data) {
     if (!data) return;
-    
     switch (data.stage) {
-        case 'upload':
-            setProgress(Math.round(data.current / data.total * 100), 
-                `上传文件: ${data.file} (${data.current}/${data.total})`);
-            break;
-        case 'analyze':
-            setProgress(data.progress || 0, data.message);
-            break;
-        case 'merge':
-            setProgress(95, data.message);
-            break;
         case 'complete':
-            setProgress(100, '分析完成');
             currentData = data.data;
             displayResults(data.data);
             break;
@@ -330,37 +283,12 @@ function processProgressEvent(data) {
     }
 }
 
-// 设置进度显示
-function setProgress(percent, message) {
-    const progressFill = document.getElementById('progressFill');
-    const progressPercent = document.getElementById('progressPercent');
-    const loadingText = document.getElementById('loadingText');
-    
-    if (progressFill) progressFill.style.width = percent + '%';
-    if (progressPercent) progressPercent.textContent = percent + '%';
-    if (loadingText) loadingText.textContent = message;
-}
-
-// 统计文件行数（用于估算进度）
-function countLinesInFile(file) {
-    return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const content = e.target.result;
-            const lines = content.split('\n').filter(line => line.trim());
-            resolve(lines.length);
-        };
-        reader.readAsText(file);
-    });
-}
-
 // ===== 手动输入 =====
 async function handleTextAnalysis() {
     const text = textInput.value.trim();
     if (!text) { showError('请输入评论内容'); return; }
     showLoading();
-    setProgress(0, '正在分析...');
-    
+
     try {
         const resp = await fetch('/input-text', {
             method: 'POST',
@@ -368,10 +296,7 @@ async function handleTextAnalysis() {
             body: JSON.stringify({ text })
         });
         const data = await resp.json();
-        
-        // 设置完成状态
-        setProgress(100, '分析完成');
-        
+
         if (resp.ok) {
             // 包装成批量格式
             const wrapped = {
@@ -431,6 +356,9 @@ function displayResults(data) {
     const allReviews = getAllReviews();
     updateReviewsList(allReviews);
     
+    // 自动保存到侧栏历史
+    saveToHistory(data);
+
     resultsSection.scrollIntoView({ behavior: 'smooth' });
 }
 
@@ -1583,3 +1511,220 @@ function exportStashedToExcel() {
     XLSX.writeFile(wb, `ABSA分析结果_全部暂存_${timestamp}.xlsx`);
     closeStashModal();
 }
+
+// ===== 侧栏 — 历史报告 =====
+const HISTORY_KEY = 'absa_history_reports';
+const MAX_HISTORY = 50;  // 最多保留 50 条
+
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    const isOpen = sidebar.classList.contains('open');
+    if (isOpen) {
+        closeSidebar();
+    } else {
+        sidebar.classList.add('open');
+        overlay.classList.add('show');
+        loadHistoryReports();
+    }
+}
+
+function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebarOverlay').classList.remove('show');
+}
+
+// ESC 关闭侧栏
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeSidebar();
+});
+
+function saveToHistory(resultData) {
+    if (!resultData || !resultData.summary) return;
+
+    const summary = resultData.summary;
+    const now = new Date();
+
+    // 只存汇总数据，不存逐条评论（批量分析时评论数据可达数MB，会超 localStorage 5MB 配额）
+    const record = {
+        id: now.getTime(),
+        timestamp: now.toLocaleString('zh-CN', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit'
+        }),
+        totalReviews: summary.total_reviews || 0,
+        totalAspects: summary.total_aspects || 0,
+        avgAspects: summary.avg_aspects_per_review || 0,
+        positiveRatio: summary.review_sentiment_dist?.positive_ratio ||
+                       summary.overall_distribution?.positive_ratio || 0,
+        negativeRatio: summary.review_sentiment_dist?.negative_ratio ||
+                       summary.overall_distribution?.negative_ratio || 0,
+        neutralRatio: summary.review_sentiment_dist?.neutral_ratio ||
+                      summary.overall_distribution?.neutral_ratio || 0,
+        topAspects: (summary.category_rankings || []).slice(0, 3).map(
+            c => `${c.category_zh}:${c.positive_ratio}%`
+        ),
+        // 仅保存汇总级数据用于图表还原（不含逐条评论 results 数组）
+        summarySnapshot: {
+            review_sentiment_dist: summary.review_sentiment_dist || null,
+            aspect_sentiment_dist: summary.aspect_sentiment_dist || null,
+            group_stats: summary.group_stats || null,
+            category_rankings: summary.category_rankings || null,
+            overall_distribution: summary.overall_distribution || null,
+        },
+    };
+
+    let history = [];
+    try {
+        history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    } catch (e) {
+        history = [];
+    }
+
+    // 去重
+    if (!history.some(h => h.id === record.id)) {
+        history.unshift(record);
+        if (history.length > MAX_HISTORY) {
+            history = history.slice(0, MAX_HISTORY);
+        }
+        try {
+            localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+        } catch (e) {
+            // 配额超限时删除最早记录后重试
+            if (history.length > 3) {
+                history = history.slice(0, Math.floor(history.length / 2));
+                try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history)); } catch (e2) {}
+            }
+        }
+    }
+
+    if (document.getElementById('sidebar').classList.contains('open')) {
+        renderHistoryList(history);
+    }
+}
+
+function loadHistoryReports() {
+    let history = [];
+    try {
+        history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    } catch (e) {
+        history = [];
+    }
+    renderHistoryList(history);
+}
+
+function renderHistoryList(history) {
+    const body = document.getElementById('sidebarBody');
+    if (!body) return;
+
+    if (!history || history.length === 0) {
+        body.innerHTML = '<div class="sidebar-empty">暂无历史报告<br><small>分析评论后自动保存</small></div>';
+        return;
+    }
+
+    let html = '';
+    history.forEach((h, index) => {
+        const topAspectsText = (h.topAspects || []).join(' · ');
+        html += `
+            <div class="history-item" onclick="viewHistoryReport(${index})">
+                <div class="history-item-header">
+                    <span class="history-item-time">📄 ${h.timestamp}</span>
+                    <button class="history-item-delete"
+                            onclick="event.stopPropagation(); deleteHistoryReport(${index})"
+                            title="删除此记录">×</button>
+                </div>
+                <div class="history-item-stats">
+                    <span>📝 ${h.totalReviews} 条</span>
+                    <span>🏷️ ${h.totalAspects} 维度</span>
+                    <span class="history-stat-positive">😊 ${h.positiveRatio}%</span>
+                    <span class="history-stat-negative">😞 ${h.negativeRatio}%</span>
+                </div>
+                ${topAspectsText ? `<div class="history-item-summary">👍 ${topAspectsText}</div>` : ''}
+            </div>
+        `;
+    });
+
+    body.innerHTML = html;
+}
+
+function viewHistoryReport(index) {
+    let history = [];
+    try {
+        history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    } catch (e) {
+        return;
+    }
+
+    const record = history[index];
+    if (!record) return;
+
+    // 如果有完整 data（旧格式兼容），直接用
+    if (record.data) {
+        currentData = JSON.parse(JSON.stringify(record.data));
+    } else if (record.summarySnapshot) {
+        // 新格式：从 summarySnapshot 还原 minimal data
+        const snap = record.summarySnapshot;
+        currentData = {
+            summary: {
+                total_reviews: record.totalReviews,
+                total_aspects: record.totalAspects,
+                avg_aspects_per_review: record.avgAspects,
+                review_sentiment_dist: snap.review_sentiment_dist || {},
+                aspect_sentiment_dist: snap.aspect_sentiment_dist || {},
+                group_stats: snap.group_stats || {},
+                category_rankings: snap.category_rankings || [],
+                overall_distribution: snap.overall_distribution || {},
+            },
+            results: [],  // 历史记录不含逐条明细
+        };
+    } else {
+        return;
+    }
+
+    // 刷新图表与统计卡片
+    resultsSection.style.display = 'block';
+    updateSummary(currentData.summary);
+    updateCharts(currentData);
+    updateGroupDetail(currentData.summary?.group_stats || {});
+
+    // 历史记录不含评论明细，清空列表
+    filteredResults = [];
+    currentPage = 1;
+    updateReviewsList([]);
+
+    // 滚动到结果区
+    resultsSection.scrollIntoView({ behavior: 'smooth' });
+
+    // 关闭侧栏
+    closeSidebar();
+}
+
+function deleteHistoryReport(index) {
+    let history = [];
+    try {
+        history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    } catch (e) {
+        return;
+    }
+
+    if (index >= 0 && index < history.length) {
+        history.splice(index, 1);
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+        renderHistoryList(history);
+    }
+}
+
+function clearHistoryReports() {
+    if (!confirm('确定要清空全部历史报告吗？此操作不可恢复。')) return;
+    localStorage.removeItem(HISTORY_KEY);
+    renderHistoryList([]);
+}
+
+// 页面初始化时加载侧栏统计
+(function initSidebarOnLoad() {
+    let history = [];
+    try {
+        history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    } catch (e) {}
+    // 静默加载，不自动打开侧栏
+})();
