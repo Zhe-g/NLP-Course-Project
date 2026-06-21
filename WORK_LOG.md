@@ -845,3 +845,254 @@ Git 在 Windows 上默认 `core.autocrlf=true`，会将 LF 转为 CRLF。"LF wil
 - **文件读取列检测重复**：CSV/XLSX review 列名匹配逻辑在 `FINAL/app.py` 和 `FINAL/sentiment_analyzer.py` 中各有一份
 - **`FINAL/uploads/` 中的临时文件**：测试上传残留，可安全清理
 - `FINAL/FINAL/` 在 git 历史中仍作为 `git mv` rename 记录存在
+
+---
+
+
+## 20. Web 前端 Bug 修复与功能迭代 (2026-06-20)
+
+> AI 辅助调试，共涉及 5 个独立问题，覆盖 CSS 层叠冲突、事件传播、localStorage 配额、生成器特性、线程通信等知识点。
+
+### 20.1 点击上传无效 — CSS 层叠冲突 + JS 缺失
+
+**表现**：点击"点击上传"区域无任何反应，文件选择框不弹出。
+
+**根因分析**：
+
+1. **CSS 冲突**：`#fileInput` 被定义两次——
+   - 旧规则 `#fileInput { display: none; }`（第 81 行）来自旧版代码
+   - 新规则 `#fileInput { position: absolute; opacity: 0; ... }`（第 616 行）是覆盖层方案
+   - CSS 规则层叠时，`opacity: 0` **不会覆盖** `display: none`——两个属性独立生效
+   - 结果：`input` 既透明又 `display: none`，完全不渲染，无法交互
+
+2. **JS 缺失**：`initDragDrop()` 只注册了拖拽事件（dragenter/dragover/dragleave/drop），没有 click 事件。重构时丢失了旧版 `dropZone.addEventListener('click', () => fileInput.click())`。
+
+**知识点 — CSS 层叠规则**：
+- `display: none` 使元素完全脱离渲染树，不占空间
+- `opacity: 0` 只是视觉透明，元素仍在渲染树中，占据空间且可交互
+- 自定义文件上传的标准模式：`opacity: 0` + `position: absolute` 覆盖层，利用浏览器原生行为
+- 不同属性不会互相覆盖，需显式清除旧规则
+
+```css
+/* 错误：两条规则叠加，display:none 未被清除 */
+#fileInput { display: none; }           /* 旧 */
+#fileInput { opacity: 0; position:... } /* 新 → display 仍然是 none */
+
+/* 正确：显式覆盖 */
+#fileInput { display: block; opacity: 0; position: absolute; ... }
+```
+
+**修复**：删除旧 `#fileInput { display: none; }` 规则，在新规则中加 `display: block`；在 `initDragDrop()` 中新增 click 监听。
+
+---
+
+### 20.2 点击一次打开两次文件对话框 — 事件冒泡
+
+**表现**：修复上传后，点击上传区域需要选两次文件。
+
+**根因**：`#fileInput` 作为绝对定位覆盖层铺满 dropZone（CSS 层），点击事件到达 `#fileInput` 触发原生文件对话框，事件冒泡到 `dropZone`，JS click handler 再次调用 `fileInput.click()`，又弹一次对话框。
+
+**知识点 — DOM 事件传播**：
+- 事件传播三阶段：捕获（capture）→ 目标（target）→ 冒泡（bubble）
+- `addEventListener` 默认注册在冒泡阶段
+- `e.target` 指向实际被点击的元素（事件源头），而非绑定监听器的元素
+- `e.stopPropagation()` 阻止冒泡，但不阻止同一元素上的其他监听器
+
+```
+用户点击 → 命中 #fileInput（opacity:0覆盖层）
+  ├─ 原生行为触发文件选择 ①
+  └─ 事件冒泡到 dropZone
+      └─ JS: fileInput.click() 再次触发 ②  ← BUG
+```
+
+**修复**：在 dropZone click handler 中判断 `e.target === fileInput`，如果是则 `return`（已被原生处理）：
+
+```javascript
+dropZone.addEventListener('click', (e) => {
+    if (e.target === fileInput || fileInput.contains(e.target)) {
+        return;  // 原生已处理，避免重复
+    }
+    fileInput.click();  // 仅兜底边缘情况（如点击 padding）
+});
+```
+
+---
+
+### 20.3 批量分析进度条一直 0% — 生成器特性与线程通信
+
+**表现**：批量上传时进度条始终停在 0%，分析完成后直接跳到结束。
+
+**根因**：`app.py` 中 `progress_callback` 函数体内用了 `yield`，它是**生成器函数**。调用方 `analyzer.analyze_file(filepath, progress_callback=progress_callback)` 只是**普通函数调用**——传入了一个生成器对象，但从不迭代它。
+
+**知识点 — Python 生成器（Generator）**：
+- 包含 `yield` 的函数是生成器函数，调用它**不会执行函数体**，而是返回一个生成器对象
+- 只有对生成器对象调用 `next()` 或在 `for` 循环中迭代时，函数体才开始执行
+- 生成器在每次 `yield` 处暂停，交出值，等待下一次迭代
+
+```python
+# 错误示范
+def progress_callback(current, total, message):
+    yield f"data: {json.dumps({...})}\n\n"  # ← 生成器函数
+
+r = analyzer.analyze_file(filepath, progress_callback=progress_callback)
+# ↑ analyzer.analyze_file 内部只是 callback(1, 100, "...")
+#   返回生成器对象，但从不 next() → yield 从未执行 → SSE 从未发送
+```
+
+**知识点 — 多线程 + 队列实现实时通信**：
+- `threading.Thread` 在 Flask 请求上下文中创建子线程执行耗时操作
+- `queue.Queue()` 是线程安全的生产者-消费者队列，`put()` 和 `get()` 内部有锁保护
+- `queue.get(timeout=0.3)` 阻塞等待，超时抛 `queue.Empty`
+- `stream_with_context` 下的生成器在主线程中 `yield` SSE 消息
+- 心跳包（heartbeat）防止代理/浏览器因长时间无数据而断开连接
+
+```
+主线程（SSE生成器）                    子线程（分析）
+    │                                    │
+    ├─ pq = queue.Queue() ──────────────┤
+    ├─ t = Thread(target=_run) ────────→│
+    │                                    ├─ analyze_file()
+    │                                    ├─ callback → pq.put(msg)
+    │  while t.is_alive():               │   ...
+    │    try: pq.get(0.3) → yield       │   循环逐条评论
+    │    except Empty: yield heartbeat   │
+    │                                    └─ 完成
+    ├─ t.join()                          │
+    ├─ 排空残余消息                       │
+    └─ yield complete/error              │
+```
+
+```python
+def _run():
+    result_holder[0] = analyzer.analyze_file(filepath, progress_callback=progress_callback)
+
+t = threading.Thread(target=_run, daemon=True)
+t.start()
+
+while t.is_alive():
+    try:
+        msg = pq.get(timeout=0.3)       # 阻塞等消息
+        yield f"data: {json.dumps(msg)}\n\n"
+    except queue.Empty:
+        yield f"data: {json.dumps({'stage': 'heartbeat'})}\n\n"
+```
+
+**后续**：用户觉得进度条太麻烦，最终决定删除整个进度条组件，只保留 spinner + "正在分析中…" 文字。
+
+---
+
+### 20.4 侧栏历史报告 + localStorage 配额溢出
+
+**功能**：新增左侧历史报告侧栏，自动保存每次分析结果。
+
+**知识点 — Web Storage API**：
+- `localStorage`：浏览器键值存储，同源共享，数据持久化（除非手动清除）
+- 每个域名配额 **~5MB**，超出抛 `QuotaExceededError`
+- `JSON.stringify()/JSON.parse()` 做序列化，大型对象（如批量评论结果）可达数 MB
+- `localStorage.setItem()` 是同步操作，可能阻塞 UI 线程
+
+**实现**：
+- 侧栏 HTML：固定定位 + `transition: left 0.3s` 实现滑入/滑出动画
+- 侧栏 CSS：`.sidebar { left: -360px }` → `.sidebar.open { left: 0 }`
+- 遮罩层：`.sidebar-overlay` 配合 `opacity` 过渡
+- 数据流：`displayResults()` → `saveToHistory()` → `localStorage.setItem()`
+- `viewHistoryReport()`：从 `summarySnapshot` 重建 minimal `currentData`，重渲染图表
+
+**遇到的关键 Bug — QuotaExceededError**：
+
+批量分析 100+ 条评论时，`saveToHistory` 将完整 `resultData`（含每条评论的 aspects 详情）存入 localStorage，单条记录可达 3-8MB，超过 5MB 配额。
+
+**修复策略 — 数据瘦身**：
+- 不保存 `results` 数组（逐条评论明细），只保存 `summarySnapshot`（4 个汇总对象）
+- 汇总对象只含 `{review_sentiment_dist, aspect_sentiment_dist, group_stats, category_rankings}`
+- 单条记录从 **~3MB → ~3KB**，缩小 1000 倍
+- 加 `try-catch` 保护，配额超限时砍掉一半旧记录后重试
+
+```javascript
+// 错误：存储整个 resultData
+const record = { data: JSON.parse(JSON.stringify(resultData)) };  // 3MB+
+
+// 正确：只存汇总
+const record = {
+    totalReviews, totalAspects, positiveRatio, ...
+    summarySnapshot: {
+        review_sentiment_dist: summary.review_sentiment_dist,  // ~200B
+        group_stats: summary.group_stats,                      // ~1KB
+        category_rankings: summary.category_rankings,           // ~1KB
+    }
+};
+```
+
+---
+
+### 20.5 单文件上传进度 — fetch API 的局限性
+
+**现象**：单文件上传使用 `fetch('/upload')`，无进度事件，进度条无法更新。
+
+**知识点 — fetch vs XHR**：
+- `fetch()` 返回 Promise，`resp.json()` 等整个响应结束后才解析——**不支持流式进度**
+- `XMLHttpRequest` 有 `xhr.onprogress` 事件，可读取部分响应（配合 SSE）
+- 因此批量上传使用 XHR + SSE 流式处理，单文件上传只能用 spinner 等待
+
+**后续**：删除进度条后，单文件/批量都统一用 spinner + 文字提示。
+
+---
+
+### 20.6 文件上传安全性 — 竞态条件 + 资源清理
+
+**Bug**：`os.remove(filepath)` 在 `finally` 块中无保护，同名文件并发上传时报 `FileNotFoundError` → Flask 500 → 返回 HTML 错误页 → 前端 JSON 解析失败。
+
+**知识点**：
+- `finally` 块无论 `try` 是否异常都会执行，适合做资源清理
+- 但 `finally` 块自身的异常**会覆盖** `try` 块中的原始异常
+- 文件清理应使用 `try-except` 包裹，容忍文件已不存在的情况
+- `uuid.uuid4().hex[:8]` 生成唯一前缀，避免并发写同一路径
+
+**修复**：
+```python
+def _safe_remove(filepath):
+    try:
+        os.remove(filepath)
+    except FileNotFoundError:
+        pass  # 已被其他进程删除，忽略
+
+# 文件名加唯一前缀
+unique_name = f"{uuid.uuid4().hex[:8]}_{secure_filename(filename)}"
+```
+
+同时在启动时清理 `uploads/` 中上次异常退出遗留的临时文件。
+
+---
+
+### 20.7 CSS 主题切换 — 紫→白蓝
+
+**修改**：全局替换 CSS 配色变量，涉及 40+ 处。
+
+**知识点 — CSS 颜色体系**：
+- 原主题：主色 `#667eea`（紫蓝 Indigo），辅色 `#764ba2`（深紫），阴影 `rgba(102,126,234,*)`
+- 新主题：主色 `#2563eb`（蓝 Blue-600），辅色 `#1d4ed8`（深蓝 Blue-700），阴影 `rgba(37,99,235,*)`
+- Header 从紫色渐变背景改为纯白 + 细边框 + 深色文字
+- 累计统计卡片从粉红渐变改为蓝色渐变
+
+| 元素 | 旧 | 新 |
+|------|----|----|
+| 主按钮/链接/边框 | `#667eea` 紫蓝 | `#2563eb` 蓝 |
+| 悬停态 | `#5a6fd6` 深紫 | `#1d4ed8` 深蓝 |
+| Header 背景 | 紫蓝渐变 + 白字 | 白色 + 深字 + 边框 |
+| 统计卡片 | 粉红渐变 | 蓝色渐变 |
+| 盒子阴影 | `rgba(102,126,234,*)` | `rgba(37,99,235,*)` |
+
+---
+
+### 20.8 今日改动汇总
+
+| # | 问题 | 涉及知识点 | 文件 |
+|---|------|-----------|------|
+| 20.1 | 点击上传无效 | CSS 层叠、`display:none` vs `opacity:0` | CSS + JS |
+| 20.2 | 双击打开文件对话框 | DOM 事件冒泡、`e.target` | JS |
+| 20.3 | 批量进度条不动 | Python 生成器 yield、多线程+队列 | Python |
+| 20.4 | 侧栏历史报告 | localStorage、Web Storage API、配额限制 | HTML/CSS/JS |
+| 20.5 | localStorage 溢出 | QuotaExceededError、数据瘦身 | JS |
+| 20.6 | 文件删除崩溃 | try-finally 异常覆盖、并发竞态、UUID | Python |
+| 20.7 | 进度条删除 | 组件精简 | HTML/CSS/JS |
+| 20.8 | 紫→白蓝主题 | CSS 颜色体系替换 | CSS |

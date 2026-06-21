@@ -88,8 +88,25 @@ class SentimentAnalyzer:
         reviews = []
 
         if ext == '.txt':
-            with open(filepath, 'r', encoding='utf-8') as f:
-                reviews = [line.strip() for line in f if line.strip()]
+            with open(filepath, 'r', encoding='utf-8-sig') as f:
+                lines = [line.strip() for line in f if line.strip()]
+            # 自动检测是否是 CSV 内容（第一行含逗号且像表头）
+            if lines and ',' in lines[0]:
+                header_parts = [h.strip().lower() for h in lines[0].split(',')]
+                if 'review' in header_parts or 'text' in header_parts:
+                    # 按 CSV 解析，兼容没有引号包裹的文本
+                    import io
+                    try:
+                        df = pd.read_csv(io.StringIO('\n'.join(lines)))
+                    except Exception:
+                        df = pd.read_csv(io.StringIO('\n'.join(lines)), quoting=3)  # QUOTE_NONE
+                    text_cols = [c for c in df.columns if c.lower() in ('review', 'text', 'reviewbody', 'content', 'comment')]
+                    col = text_cols[0] if text_cols else df.columns[0]
+                    reviews = df[col].dropna().astype(str).tolist()
+                else:
+                    reviews = lines
+            else:
+                reviews = lines
         elif ext == '.csv':
             df = pd.read_csv(filepath)
             # 自动找评论文本列
